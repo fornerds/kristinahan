@@ -1,0 +1,65 @@
+.filter {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    background-color: #f3f4f6;
+    height: 60px;
+    width: 100%;
+    padding: 0 14px;
+    box-sizing: border-box;
+    border-radius: 10px;
+}
+
+.searchWrap {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.searchInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 150px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 10px;
+    margin-left: 6px;
+}
+
+.searchButton {
+    width: 30px;
+    height: 30px;
+    background-color: dimgrey;
+}
+
+.orderStatusWrap {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+#orderStatus {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 80px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin-left: 6px;
+}
+
+.dateRangeWrap {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.dateInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 106px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin: 0 10px;
+}

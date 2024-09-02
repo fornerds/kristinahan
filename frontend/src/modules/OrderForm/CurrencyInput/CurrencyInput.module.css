@@ -1,0 +1,9 @@
+.currencyInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 180px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    background-color: white;
+}
