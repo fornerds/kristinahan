@@ -50,90 +50,94 @@ export const OrderList = () => {
     }))
   }, [])
 
-  const handleOrderStatusChange = useCallback((id, newStatus, isDraft = false) => {
+  const handleOrderStatusChange = useCallback((event, id, isDraft = false) => {
+    event.stopPropagation(); // 이벤트 전파 방지
+    const newStatus = event.target.value;
     const updateOrders = (prevOrders) =>
-      prevOrders.map(order => 
+      prevOrders.map((order) =>
         order.id === id ? { ...order, order_status: newStatus } : order
-      )
-    
+      );
+
     if (isDraft) {
-      setDrafts(updateOrders)
+      setDrafts(updateOrders);
     } else {
-      setOrders(updateOrders)
+      setOrders(updateOrders);
     }
-  }, [])
+  }, []);
 
   const sortItems = (items) => {
-    if (sortConfig.key) {
+      if (sortConfig.key) {
       return [...items].sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
           return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
           return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
+          }
+          return 0;
       });
-    }
-    return items;
+      }
+      return items;
   }
 
-  const handleRowClick = (order) => {
-    navigate(`/event/${event_id}/${order.id}`)
+  const handleRowClick = (event, order) => {
+      if (event.target.tagName.toLowerCase() !== 'select') {
+          navigate(`/admin/order/${order.id}`);
+        }
   }
 
   const renderTable = (items, isDraft = false) => (
-    <table className={styles.table}>
+      <table className={styles.table}>
       <thead>
-        <tr>
-          <th scope="col">작성자</th>
-          <th scope="col">주문자</th>
-          <th scope="col">소속</th>
-          <th scope="col">수령방법</th>
-          <th scope="col">주문상태</th>
-          <th scope="col" onClick={() => handleSort('order_date')} style={{cursor: 'pointer'}}>
-            주문일자 {sortConfig.key === 'order_date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-          </th>
-          <th scope="col">총주문금액</th>
-          <th scope="col">총결제금액</th>
-          <th scope="col">결제자</th>
-          <th scope="col">주소지</th>
-        </tr>
+          <tr>
+            <th scope="col">작성자</th>
+            <th scope="col">주문자</th>
+            <th scope="col">소속</th>
+            <th scope="col">수령방법</th>
+            <th scope="col">주문상태</th>
+            <th scope="col" onClick={() => handleSort('order_date')} style={{cursor: 'pointer'}}>
+                주문일자 {sortConfig.key === 'order_date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+            </th>
+            <th scope="col">총주문금액</th>
+            <th scope="col">총결제금액</th>
+            <th scope="col">결제자</th>
+            <th scope="col">주소지</th>
+          </tr>
       </thead>
       <tbody>
-        {items.map((order) => (
-          <tr key={order.id} onClick={()=> handleRowClick(order)} className={styles.orderLink}>
-            <td>{order.writer}</td>
-            <td>{order.customer}</td>
-            <td>{order.relation}</td>
-            <td>{order.takeout}</td>
-            <td>
+          {items.map((order) => (
+          <tr key={order.id} onClick={(event)=> handleRowClick(event, order)} className={styles.orderLink}>
+              <td>{order.writer}</td>
+              <td>{order.customer}</td>
+              <td>{order.relation}</td>
+              <td>{order.takeout}</td>
+              <td>
               <select 
-                name={`order_${order.id}`} 
-                id={`order_${order.id}`} 
-                className={styles.orderStatus}
-                value={order.order_status}
-                onChange={(e) => handleOrderStatusChange(order.id, e.target.value, isDraft)}
+                  name={`order_${order.id}`} 
+                  id={`order_${order.id}`} 
+                  className={styles.orderStatus}
+                  value={order.order_status}
+                  onChange={(event) => handleOrderStatusChange(event, order.id, isDraft)}
               >
-                <option value="주문완료">주문완료</option>
-                <option value="포장완료">포장완료</option>
-                <option value="수선접수">수선접수</option>
-                <option value="수선완료">수선완료</option>
-                <option value="배송중">배송중</option>
-                <option value="배송완료">배송완료</option>
-                <option value="수령완료">수령완료</option>
-                <option value="숙소">숙소</option>
+                  <option value="주문완료">주문완료</option>
+                  <option value="포장완료">포장완료</option>
+                  <option value="수선접수">수선접수</option>
+                  <option value="수선완료">수선완료</option>
+                  <option value="배송중">배송중</option>
+                  <option value="배송완료">배송완료</option>
+                  <option value="수령완료">수령완료</option>
+                  <option value="숙소">숙소</option>
               </select>
-            </td>
-            <td>{order.order_date.toLocaleDateString("ko-KR")}</td>
-            <td>{order.total_cost}</td>
-            <td>{order.total_paid}</td>
-            <td>{order.buyer}</td>
-            <td>{order.address}</td>
+              </td>
+              <td>{order.order_date.toLocaleDateString("ko-KR")}</td>
+              <td>{order.total_cost}</td>
+              <td>{order.total_paid}</td>
+              <td>{order.buyer}</td>
+              <td>{order.address}</td>
           </tr>
-        ))}
+          ))}
       </tbody>
-    </table>
+      </table>
   )
 
   const sortedEventList = sortItems(orders)

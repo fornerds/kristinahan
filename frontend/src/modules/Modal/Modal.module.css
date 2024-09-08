@@ -53,3 +53,13 @@
     background-color: var(--danger-color);
     color: white;
   }
+
+  .eventSelect {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 120px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin-bottom: 40px;
+  }

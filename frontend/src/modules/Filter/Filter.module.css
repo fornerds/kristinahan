@@ -32,10 +32,20 @@
     background-color: dimgrey;
 }
 
-.orderStatusWrap {
+.orderStatusWrap, .eventSelectWrap {
     display: flex;
     gap: 4px;
     align-items: center;
+}
+
+.eventSelect {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 120px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin-left: 6px;
 }
 
 #orderStatus {

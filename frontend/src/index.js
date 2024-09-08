@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './global.css'
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { worker } from './mocks/browser';
+// import { worker } from './mocks/browser';
 
 async function prepare() {
   if (process.env.NODE_ENV === 'development') {

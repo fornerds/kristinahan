@@ -3,7 +3,13 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Login } from "./pages/Login";
 import { Event, OrderList, Create, Order } from "./pages/Event";
 import { AdminLogin } from "./pages/Admin/Login";
-
+import { WriterList } from "./pages/Admin/Writer";
+import { AffiliationList } from "./pages/Admin/Affiliation";
+import { OrderList as AdminOrderList, Create as AdminOrderCreate, Order as AdminOrderEdit} from "./pages/Admin/Order";
+import { OrderFormList, Create as OrderFormCreate, OrderForm as OrderFormEdit } from "./pages/Admin/OrderForm";
+import { ProductList, Create as ProductCreate, Product as ProductEdit } from "./pages/Admin/Product";
+import { EventList, Create as EventCreate, Event as EventEdit } from "./pages/Admin/Event";
+import { Password } from "./pages/Admin/Password";
 
 function App() {
   return (
@@ -15,6 +21,21 @@ function App() {
         <Route path="/event/:event_id/create" element={<Create />} />
         <Route path="/event/:event_id/:order_id" element={<Order />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/writer" element={<WriterList />} />
+        <Route path="/admin/affiliation" element={<AffiliationList />} />
+        <Route path="/admin/order" element={<AdminOrderList />} />
+        <Route path="/admin/order/create/:event_id" element={<AdminOrderCreate />} />
+        <Route path="/admin/order/:event_id/:order_id" element={<AdminOrderEdit />} />
+        <Route path="/admin/orderform" element={<OrderFormList />} />
+        <Route path="/admin/orderform/create" element={<OrderFormCreate />} />
+        <Route path="/admin/orderform/:orderform_id" element={<OrderFormEdit />} />
+        <Route path="/admin/product" element={<ProductList />} />
+        <Route path="/admin/product/create" element={<ProductCreate />} />
+        <Route path="/admin/product/:category_id" element={<ProductEdit />} />
+        <Route path="/admin/event" element={<EventList />} />
+        <Route path="/admin/event/create" element={<EventCreate />} />
+        <Route path="/admin/event/:event_id" element={<EventEdit />} />
+        <Route path="/admin/password" element={<Password />} />
       </Routes>
     </BrowserRouter>
   );
