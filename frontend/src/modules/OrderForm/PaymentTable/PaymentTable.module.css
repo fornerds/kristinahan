@@ -1,0 +1,47 @@
+.sectionVerticalGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.spacebetween {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sectionGroup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sectionLabel {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.prepaid {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 106px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin: 0 10px;
+}
+
+.table {
+    width: 100%;
+    margin-bottom: 40px;
+}
+
+.table th, .table td {
+    border: 1px solid #dedfe6;
+    padding: 16px 6px;
+}
+
+.table th {
+    background-color: #fafafb;
+    color: #565e6d;
+}

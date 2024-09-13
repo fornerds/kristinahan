@@ -1,0 +1,158 @@
+
+.sectionWrap {
+    width: 100%;
+    padding: 32px 28px;
+    border: 1px solid var(--cancel-color);
+    border-radius: 12px;
+    margin-top: 20px;
+    box-sizing: border-box;
+}
+
+.sectionTitle {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 40px;
+}
+
+.sectionValueWrap {
+    margin-top: 22px;
+    display: flex;
+    gap: 10px;
+}
+
+.sectionGroupWrap {
+    margin-top: 22px;
+    display: flex;
+    gap: 30px;
+}
+
+.sectionGroup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sectionVerticalGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sectionLabel {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.sectionValue {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+#writer, .currency {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 80px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin-left: 6px;
+}
+
+.textInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 200px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    background-color: white;
+}
+
+#relation, #takeout, #types, #sizes {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 200px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+}
+
+.addressInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 440px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    background-color: white;
+}
+
+.optionalMessage {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 674px;
+    min-height: 30px;
+}
+
+.table {
+    width: 100%;
+    margin-bottom: 40px;
+}
+
+.table th, .table td {
+    border: 1px solid #dedfe6;
+    padding: 16px 6px;
+}
+
+.table th {
+    background-color: #fafafb;
+    color: #565e6d;
+}
+
+.numberInput {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 40px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    background-color: white;
+}
+
+.prepaid {
+    border: 1px solid var(--cancel-color);
+    border-radius: 6px;
+    width: 106px;
+    height: 30px;
+    font-size: 14px;
+    padding: 0 4px;
+    margin: 0 10px;
+}
+
+.spacebetween {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.calculator {
+    margin-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.hr {
+    width: 100%;
+    height: 1px;
+    border: 0;
+    background-color: #dddddd;
+}
+
+.paid {
+    color: var(--danger-color);
+}
+
+.rest {
+    color: var(--main-color);
+}
