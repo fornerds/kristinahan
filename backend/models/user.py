@@ -1,11 +1,15 @@
-from sqlalchemy import Column, String, Enum
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, Enum as SQLAlchemyEnum, Integer
+from database import Base
+from enum import Enum
 
-Base = declarative_base()
+class UserRole(str, Enum):
+    User = 'user'
+    Admin = 'admin'
+
 
 class User(Base):
     __tablename__ = 'user'
-    
-    id = Column(String(255), primary_key=True)
-    password = Column(String(255))
-    role = Column(Enum('user', 'admin'))
+
+    id = Column(Integer, primary_key=True, autoincrement=True) 
+    password = Column(String(255), nullable=False)
+    role = Column(SQLAlchemyEnum(UserRole), nullable=False)

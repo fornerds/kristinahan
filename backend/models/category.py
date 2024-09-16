@@ -1,12 +1,14 @@
-from sqlalchemy import Column, String, TIMESTAMP
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, TIMESTAMP, Integer
+from database import Base
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
 
 class Category(Base):
     __tablename__ = 'category'
-    
-    id = Column(String(255), primary_key=True)
-    name = Column(String(255))
-    created_at = Column(TIMESTAMP)
-    
+
+    id = Column(Integer, primary_key=True, autoincrement=True) 
+    name = Column(String(255), nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False)
+
+    form_categories = relationship('FormCategory', back_populates='category')
+    products = relationship('Product', back_populates="category")

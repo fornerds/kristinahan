@@ -1,10 +1,12 @@
-from sqlalchemy import Column, String
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, Integer
+from database import Base
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
 
 class Author(Base):
     __tablename__ = 'author'
 
-    id = Column(String(255), primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True) 
     name = Column(String(255), nullable=False)
+
+    authored_orders = relationship('Order', back_populates='author')

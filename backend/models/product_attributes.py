@@ -1,11 +1,14 @@
-from sqlalchemy import Column, String, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, ForeignKey, Integer
+from database import Base
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
 
 class ProductAttributes(Base):
     __tablename__ = 'product_attributes'
 
-    id = Column(String(255), primary_key=True)
-    product_id = Column(String(255), ForeignKey('product.id'), nullable=False)
-    attribute_id = Column(String(255), ForeignKey('attributes.id'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True) 
+    product_id = Column(Integer, ForeignKey('product.id'), nullable=False)
+    attribute_id = Column(Integer, ForeignKey('attributes.id'), nullable=False)
+
+    product = relationship('Product', back_populates='product_attributes', overlaps="attributes,products")
+    attribute = relationship('Attributes', back_populates='product_attributes', overlaps="attributes,products")

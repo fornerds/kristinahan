@@ -1,19 +1,37 @@
-from sqlalchemy import Column, String, ForeignKey, DECIMAL, TIMESTAMP
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, String, ForeignKey, DECIMAL, TIMESTAMP, Enum as SQLAlchemyEnum, Integer
+from database import Base
+from sqlalchemy.orm import relationship
+from enum import Enum
 
-Base = declarative_base()
+class CurrencyType(str, Enum):
+    KRW = 'KRW'
+    JPY = 'JPY'
+    USD = 'USD'
+
+class TradeInCurrencyType(str, Enum):
+    K10 = '10K'
+    K14 = '14K'
+    K18 = '18K'
+    K24 = '24K'
+
+class PaymentMethodType(str, Enum):
+    ADVANCE = 'advance'
+    BALANCE = 'balance'
 
 class Payments(Base):
-    __tablename__ = 'Payments'
+    __tablename__ = 'payments'
 
-    id = Column(String(255), primary_key=True)
-    order_id = Column(String(255), ForeignKey('order.id'), nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True) 
+    order_id = Column(Integer, ForeignKey('order.id'), nullable=False)
     payment_date = Column(TIMESTAMP, nullable=False)
-    cash_amount = Column(DECIMAL(10, 2), nullable=False)
-    cash_currency = Column(String(20), nullable=False)  # ENUM 처리 필요
-    card_amount = Column(DECIMAL(10, 2), nullable=False)
-    card_currency = Column(String(20), nullable=False)  # ENUM 처리 필요
-    trade_in_amount = Column(DECIMAL(10, 2), nullable=False)
-    trade_in_currency = Column(String(20), nullable=False)  # ENUM 처리 필요
+    cashAmount = Column(DECIMAL(10, 2), nullable=False)
+    cashCurrency = Column('cashCurrency', SQLAlchemyEnum(CurrencyType), nullable=False)
+    cardAmount = Column(DECIMAL(10, 2), nullable=False)
+    cardCurrency = Column('cardCurrency', SQLAlchemyEnum(CurrencyType), nullable=False)
+    tradeInAmount = Column(DECIMAL(10, 2), nullable=False)
+    tradeInCurrency = Column('tradeInCurrency', SQLAlchemyEnum(TradeInCurrencyType), nullable=False)
     notes = Column(String, nullable=True)  # TEXT type
-    payment_method = Column(String(20), nullable=False)  # ENUM 처리 필요
+    paymentMethod = Column('paymentMethod', SQLAlchemyEnum(PaymentMethodType), nullable=False)
+
+    # Relationship
+    order = relationship('Order', back_populates='payments')
