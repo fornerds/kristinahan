@@ -1,0 +1,75 @@
+.adminLayout {
+    display: flex;
+}
+
+.adminMainWrap {
+    width: calc(100vw - 300px);
+    box-sizing: border-box;
+    padding: 40px 60px;
+    display: flex;
+    flex-direction: column;
+}
+
+.adminTitle {
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.tableWrap {
+    border-radius : 12px;
+}
+
+.managementSection {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.table {
+    margin-top: 30px;
+    width: 240px;
+    margin-bottom: 20px;
+}
+
+.table tr, .table td, .table th {
+    border: 1px solid #dadde3;
+}
+
+.table thead {
+    background-color: #fafafb;
+}
+
+.table tr th, .table tr td {
+    font-size: 14px;
+    padding: 10px 10px 10px 4px;
+}
+
+.table tr:nth-child(even) td{
+    background-color: #fafafb;
+    cursor: pointer;
+}
+
+.table tr:nth-child(odd) td{
+    background-color: white;
+    cursor: pointer;
+}
+
+.deleteButton {
+    width: 40px;
+    height: 30px;
+}
+
+.addButton {
+    display: flex;
+    justify-content: center;
+    font-size: 14px;
+    background-color: transparent;
+    color: var(--main-color);
+}
+
+.saveButton {
+    margin-top: 20px;
+    width: 100%;
+}

@@ -1,0 +1,36 @@
+.orderTableBackground {
+    width: 100vw;
+    min-height: 700px;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 60px 0;
+}
+
+.tableWrap {
+    flex-direction: column;
+    height: 100%;
+    min-height: 800px;
+    justify-content: space-around;
+    padding: 24px;
+    width: 800px;
+}
+
+.tableTitleWrap {
+    display: flex;
+    gap: 10px;
+}
+
+
+.tableTitle {
+    font-size: 26px;
+    margin-bottom: 30px;
+}
+
+.actionButtonsWrap {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 22px;
+}

@@ -1,0 +1,96 @@
+.button {
+    font-family: "Lexend", "Helvetica", sans-serif;
+    font-size: 16px;
+    font-weight: medium;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-block;
+    text-align: center;
+    vertical-align: middle;
+    text-decoration: none;
+    outline: none;
+    padding: 0;
+    transition: background-color 0.3s, color 0.3s; /* 텍스트 색상에 대한 트랜지션을 추가 */
+  }
+  
+  .button--2xs {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .button--xs {
+    width: 105px;
+    height: 36px;
+  }
+  
+  .button--sm {
+    width: 125px;
+    height: 36px;
+  }
+  
+  .button--md {
+    width: 165px;
+    height: 44px;
+  }
+  
+  .button--lg {
+    width: 200px;
+    height: 56px;
+  }
+  
+  .button--full {
+    width: 100%;
+    height: 56px;
+  }
+  
+  .button--default {
+    background-color: var(--main-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button--primary {
+    border: 1px solid var(--main-color);
+    background-color: white;
+    color: var(--main-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button--secondary {
+    border: 1px solid var(--main-color);
+    background-color: white;
+    color: var(--main-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button--danger {
+    background-color: var(--danger-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button--cancel {
+    background-color: var(--cancel-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .button-icon {
+    /* margin-right: 8px; */
+    vertical-align: middle;
+  }
+  
+  button:disabled {
+    cursor: not-allowed;
+  }
