@@ -3,6 +3,7 @@ import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 from database import get_db
 from models import *
 from routes import *
@@ -211,6 +212,15 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+# CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:8000"],  # 허용할 프론트엔드 도메인 추가
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
 
 # 라우트 등록
 app.include_router(auth_routes.router)
