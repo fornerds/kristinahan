@@ -216,7 +216,7 @@ app = FastAPI(lifespan=lifespan)
 # CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:8000"],  # 허용할 프론트엔드 도메인 추가
+    allow_origins=["http://localhost:3000", "http://localhost:8000", "https://kristinahan-hjox6nrbz-kangpungyuns-projects.vercel.app"],  # 허용할 프론트엔드 도메인 추가
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 헤더 허용
