@@ -1,18 +1,22 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef } from "react";
 import styles from "./OrderEditLayout.module.css";
-import { ReactComponent as LeftArrow } from '../../asset/icon/left_small.svg'
-import OrderForm from '../OrderForm/OrderForm'
+import { ReactComponent as LeftArrow } from "../../asset/icon/left_small.svg";
+import OrderForm from "../OrderForm/OrderForm";
 import { Button, Link } from "../../components";
 import { Modal } from "../Modal";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
+import { useOrderDetails } from "../../api/hooks";
 
-export const OrderEditLayout = ({ event_id, event_name }) => {
+export const OrderEditLayout = ({ event_name }) => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const location = useLocation();
   const printableAreaRef = useRef(null);
+  const { event_id, orderId } = useParams();
 
-  const isAdminOrderCreate = location.pathname.startsWith('/admin/order');
-  const backLink = isAdminOrderCreate ? '/admin/order' : `/event/${event_id}`;
+  const { data: orderDetails, isLoading, error } = useOrderDetails(orderId);
+
+  const isAdminOrderCreate = location.pathname.startsWith("/admin/order");
+  const backLink = isAdminOrderCreate ? "/admin/order" : `/event/${event_id}`;
 
   const handleSave = () => {
     // 임시 저장 로직
@@ -52,22 +56,42 @@ export const OrderEditLayout = ({ event_id, event_name }) => {
     document.body.innerHTML = originalContent;
   };
 
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error loading order details: {error.message}</div>;
+
   return (
     <div className={styles.orderTableBackground}>
       <div className={styles.tableWrap}>
         <div className={styles.tableTitleWrap}>
-          <Link to={backLink}><LeftArrow /></Link>
+          <Link to={backLink}>
+            <LeftArrow />
+          </Link>
           <h2 className={styles.tableTitle}>{`[${event_name}] 주문서 수정`}</h2>
         </div>
         <div ref={printableAreaRef}>
-          <OrderForm 
-            event_id={event_id} 
-            isEdit={true} 
-          />
+          {orderDetails && (
+            <OrderForm
+              event_id={event_id}
+              isEdit={true}
+              orderId={orderId}
+              initialData={orderDetails}
+              onSave={handleSave}
+              onComplete={() => setIsConfirmModalOpen(true)}
+            />
+          )}
         </div>
         <div className={styles.actionButtonsWrap}>
-          <Button label="인쇄하기" className={styles.actionButton} variant='secondary' onClick={handlePrint} />
-          <Button label="수정 완료" className={styles.actionButton} onClick={()=>setIsConfirmModalOpen(true)} />
+          <Button
+            label="인쇄하기"
+            className={styles.actionButton}
+            variant="secondary"
+            onClick={handlePrint}
+          />
+          <Button
+            label="수정 완료"
+            className={styles.actionButton}
+            onClick={() => setIsConfirmModalOpen(true)}
+          />
         </div>
       </div>
       <Modal

@@ -1,20 +1,19 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import styles from './TabNavigation.module.css';
-import { ReactComponent as UserIcon } from '../../asset/icon/user.svg'
-import { ReactComponent as GlobeIcon } from '../../asset/icon/globe.svg'
-import { ReactComponent as OrderIcon } from '../../asset/icon/order.svg'
-import { ReactComponent as ProductIcon } from '../../asset/icon/product.svg'
-import { ReactComponent as OrderFormIcon } from '../../asset/icon/order_form.svg'
-import { ReactComponent as EventIcon } from '../../asset/icon/event.svg'
-import { ReactComponent as LockIcon } from '../../asset/icon/lock.svg'
+import React from "react";
+import { NavLink } from "react-router-dom";
+import styles from "./TabNavigation.module.css";
+import { ReactComponent as UserIcon } from "../../asset/icon/user.svg";
+import { ReactComponent as GlobeIcon } from "../../asset/icon/globe.svg";
+import { ReactComponent as OrderIcon } from "../../asset/icon/order.svg";
+import { ReactComponent as ProductIcon } from "../../asset/icon/product.svg";
+import { ReactComponent as OrderFormIcon } from "../../asset/icon/order_form.svg";
+import { ReactComponent as EventIcon } from "../../asset/icon/event.svg";
+import { ReactComponent as LockIcon } from "../../asset/icon/lock.svg";
 
 export const TabNavigation = () => {
-  const getNavLinkClass = ({ isActive }) => 
-    `${styles.tab} ${isActive ? styles.activeTab : ''}`;
+  const getNavLinkClass = ({ isActive }) =>
+    `${styles.tab} ${isActive ? styles.activeTab : ""}`;
 
-  const getIconColor = (isActive) => 
-    isActive ? '#4069e5' : '#333';
+  const getIconColor = (isActive) => (isActive ? "#4069e5" : "#333");
 
   return (
     <nav className={styles.tabNavigation}>
@@ -45,7 +44,10 @@ export const TabNavigation = () => {
       <NavLink to="/admin/orderform" className={getNavLinkClass}>
         {({ isActive }) => (
           <>
-            <OrderFormIcon className={styles.icon} fill={getIconColor(isActive)} />
+            <OrderFormIcon
+              className={styles.icon}
+              fill={getIconColor(isActive)}
+            />
             주문서 양식 관리
           </>
         )}
@@ -53,15 +55,21 @@ export const TabNavigation = () => {
       <NavLink to="/admin/product" className={getNavLinkClass}>
         {({ isActive }) => (
           <>
-            <ProductIcon className={styles.icon} fill={getIconColor(isActive)} />
-            상품 관리
+            <ProductIcon
+              className={styles.icon}
+              fill={getIconColor(isActive)}
+            />
+            카테고리(상품) 관리
           </>
         )}
       </NavLink>
       <NavLink to="/admin/event" className={getNavLinkClass}>
         {({ isActive }) => (
           <>
-            <EventIcon className={styles.icon} stroke={getIconColor(isActive)} />
+            <EventIcon
+              className={styles.icon}
+              stroke={getIconColor(isActive)}
+            />
             행사 관리
           </>
         )}

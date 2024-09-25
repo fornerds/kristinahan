@@ -1,93 +1,82 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React from "react";
 import { Button } from "../../components";
-import { ReactComponent as SearchIcon } from '../../asset/icon/search.svg';
+import { ReactComponent as SearchIcon } from "../../asset/icon/search.svg";
 import styles from "./Filter.module.css";
 
-// 더미 데이터 생성 함수
-const generateEventData = () => {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 8 }, (_, index) => ({
-        year: currentYear + index - 3,
-        name: `${currentYear + index - 3}년 행사`
-    }));
-};
+export const Filter = ({ filters, setFilters }) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
 
-export const Filter = () => {
-    const location = useLocation();
-    const [events, setEvents] = useState([]);
-    const [selectedEvent, setSelectedEvent] = useState('');
-    const isAdminOrderPage = location.pathname === '/admin/order';
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+    // 날짜가 비어있으면 null로 설정
+    setFilters((prev) => ({ ...prev, [name]: value ? value : null }));
+  };
 
-    useEffect(() => {
-        if (isAdminOrderPage) {
-            // API 호출을 시뮬레이션하는 비동기 함수
-            const fetchEvents = async () => {
-                // 실제 API 호출 대신 setTimeout을 사용하여 비동기 작업 시뮬레이션
-                setTimeout(() => {
-                    const data = generateEventData();
-                    setEvents(data);
-                }, 500);
-            };
+  const handleSearch = () => {
+    // 검색 로직을 여기에 구현합니다.
+    console.log("Current filters:", filters);
+  };
 
-            fetchEvents();
-        }
-    }, [isAdminOrderPage]);
+  return (
+    <div className={styles.filter}>
+      <div className={styles.searchWrap}>
+        <label htmlFor="search">검색</label>
+        <input
+          type="search"
+          className={styles.searchInput}
+          placeholder="고객명, 작성자, 결제자, 주소, 소속"
+          name="search"
+          value={filters.search}
+          onChange={handleInputChange}
+        />
+        <Button className={styles.searchButton} onClick={handleSearch}>
+          <SearchIcon strokeOpacity="1" />
+        </Button>
+      </div>
 
-    const handleEventChange = (e) => {
-        setSelectedEvent(e.target.value);
-    };
+      <div className={styles.orderStatusWrap}>
+        <label htmlFor="status">주문상태</label>
+        <select
+          name="status"
+          id={styles.orderStatus}
+          value={filters.status}
+          onChange={handleInputChange}
+        >
+          <option value="">전체</option>
+          <option value="Order_Completed">주문완료</option>
+          <option value="Packaging_Completed">포장완료</option>
+          <option value="Repair_Received">수선접수</option>
+          <option value="Repair_Completed">수선완료</option>
+          <option value="In_delivery">배송중</option>
+          <option value="Delivery_completed">배송완료</option>
+          <option value="Receipt_completed">수령완료</option>
+          <option value="Accommodation">숙소</option>
+        </select>
+      </div>
 
-    return (
-        <div className={styles.filter}>
-            <div className={styles.searchWrap}>
-                <label htmlFor="search">검색</label>
-                <input type="search" className={styles.searchInput} placeholder="고객명, 국가, 소속 등" name="search"/>
-                <Button className={styles.searchButton}>
-                    <SearchIcon strokeOpacity="1" />
-                </Button>
-            </div>
-
-            {isAdminOrderPage && (
-                <div className={styles.eventSelectWrap}>
-                    <label htmlFor="eventSelect">행사명</label>
-                    <select
-                        name="eventSelect"
-                        id="eventSelect"
-                        className={styles.eventSelect}
-                        value={selectedEvent}
-                        onChange={handleEventChange}
-                    >
-                        {events.map((event) => (
-                            <option key={event.year} value={event.year}>
-                                {event.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
-            <div className={styles.orderStatusWrap}>
-                <label htmlFor="orderStatus">주문상태</label>
-                <select name="orderStatus" id={styles.orderStatus} >
-                    <option value="">전체</option>
-                    <option value="주문완료">주문완료</option>
-                    <option value="포장완료">포장완료</option>
-                    <option value="수선접수">수선접수</option>
-                    <option value="수선완료">수선완료</option>
-                    <option value="배송중">배송중</option>
-                    <option value="배송완료">배송완료</option>
-                    <option value="수령완료">수령완료</option>
-                    <option value="숙소">숙소</option>
-                </select>
-            </div>
-
-            <div className={styles.dateRangeWrap}>
-                <label htmlFor="startDate">작성일자</label>
-                <input type="date" name="startDate" id="startDate" className={styles.dateInput} />
-                ~
-                <input type="date" name="endDate" id="endDate" className={styles.dateInput} />
-            </div>
-        </div>
-    );
+      <div className={styles.dateRangeWrap}>
+        <label htmlFor="order_date_from">작성일자</label>
+        <input
+          type="date"
+          name="order_date_from"
+          id="order_date_from"
+          className={styles.dateInput}
+          value={filters.order_date_from || ""}
+          onChange={handleDateChange}
+        />
+        ~
+        <input
+          type="date"
+          name="order_date_to"
+          id="order_date_to"
+          className={styles.dateInput}
+          value={filters.order_date_to || ""}
+          onChange={handleDateChange}
+        />
+      </div>
+    </div>
+  );
 };
