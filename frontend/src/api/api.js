@@ -59,8 +59,11 @@ export const adminLogin = (id, password) =>
       "Content-Type": "application/x-www-form-urlencoded",
     },
   });
-export const changePassword = (userId, oldPassword, newPassword) =>
+export const changePassword = (userId, oldPassword, newPassword, token) =>
   api.put(`/user/change-password?user_id=${userId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
     old_password: oldPassword,
     new_password: newPassword,
   });
@@ -146,3 +149,4 @@ export const getFormDetails = (formId) => api.get(`/forms/${formId}`);
 export const updateForm = (formId, formData) =>
   api.put(`/forms/${formId}`, formData);
 export const deleteForm = (formId) => api.delete(`/forms/${formId}`);
+export const duplicateForm = (formId) => api.post(`/forms/${formId}/duplicate`);

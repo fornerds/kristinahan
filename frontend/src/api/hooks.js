@@ -24,12 +24,12 @@ export const useAdminLogin = () => {
 export const useChangePassword = () => {
   return useMutation(
     ({ oldPassword, newPassword }) => {
-      // const userId = localStorage.getItem("adminToken"); // 관리자 토큰을 로컬 스토리지에서 가져옵니다.
-      const userId = 2;
+      const token = localStorage.getItem("adminToken"); // 관리자 토큰을 로컬 스토리지에서 가져옵니다.
+      const userId = 1;
       if (!userId) {
         throw new Error("User ID not found. Please log in again.");
       }
-      return api.changePassword(userId, oldPassword, newPassword);
+      return api.changePassword(userId, oldPassword, newPassword, token);
     },
     {
       onError: (error) => {
@@ -332,6 +332,15 @@ export const useUpdateForm = () => {
 export const useDeleteForm = () => {
   const queryClient = useQueryClient();
   return useMutation(api.deleteForm, {
+    onSuccess: () => {
+      queryClient.invalidateQueries("forms");
+    },
+  });
+};
+
+export const useDuplicateForm = () => {
+  const queryClient = useQueryClient();
+  return useMutation(api.duplicateForm, {
     onSuccess: () => {
       queryClient.invalidateQueries("forms");
     },

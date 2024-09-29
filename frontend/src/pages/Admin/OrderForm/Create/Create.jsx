@@ -12,18 +12,32 @@ export const Create = () => {
   const createFormMutation = useCreateForm();
 
   const [formName, setFormName] = useState("");
+  const [formNameError, setFormNameError] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [measurementUnits, setMeasurementUnits] = useState({
-    자켓소매: "inch",
-    자켓길이: "inch",
-    자켓폼: "inch",
-    바지둘레: "inch",
-    바지길이: "inch",
-    셔츠목: "inch",
-    셔츠소매: "inch",
-    드레스등폼: "inch",
-    드레스길이: "inch",
+    자켓소매: "CM",
+    자켓길이: "CM",
+    자켓폼: "CM",
+    바지둘레: "CM",
+    바지길이: "CM",
+    셔츠목: "CM",
+    셔츠소매: "CM",
+    드레스등폼: "CM",
+    드레스길이: "CM",
   });
+
+  const measurementUnitMapping = {
+    자켓소매: "jacketSleeve",
+    자켓길이: "jacketLength",
+    자켓폼: "jacketForm",
+    바지둘레: "pantsCircumference",
+    바지길이: "pantsLength",
+    셔츠목: "shirtNeck",
+    셔츠소매: "shirtSleeve",
+    드레스등폼: "dressBackForm",
+    드레스길이: "dressLength",
+  };
+
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
     title: "",
@@ -38,58 +52,67 @@ export const Create = () => {
       categories.length > 0 &&
       selectedCategories.length === 0
     ) {
-      setSelectedCategories([
-        {
-          id: Date.now(),
-          categoryId: categories[0].id,
-          name: categories[0].name,
-        },
-      ]);
+      setSelectedCategories([categories[0].id]);
     }
   }, [categories]);
 
   const addCategory = () => {
     if (categories && categories.length > 0) {
-      const newCategory = {
-        id: Date.now(),
-        categoryId: categories[0].id,
-      };
-      setSelectedCategories([...selectedCategories, newCategory]);
+      const newCategoryId = categories.find(
+        (cat) => !selectedCategories.includes(cat.id)
+      )?.id;
+      if (newCategoryId) {
+        setSelectedCategories([...selectedCategories, newCategoryId]);
+      }
     }
   };
 
   const removeCategory = (id) => {
-    setSelectedCategories(selectedCategories.filter((cat) => cat.id !== id));
+    setSelectedCategories(selectedCategories.filter((catId) => catId !== id));
   };
 
-  const handleCategoryChange = (id, value) => {
-    setSelectedCategories(
-      selectedCategories.map((cat) =>
-        cat.id === id ? { ...cat, categoryId: Number(value) } : cat
-      )
-    );
+  const handleCategoryChange = (index, value) => {
+    const newSelectedCategories = [...selectedCategories];
+    newSelectedCategories[index] = Number(value);
+    setSelectedCategories(newSelectedCategories);
   };
 
   const handleMeasurementUnitChange = (field, value) => {
     setMeasurementUnits({ ...measurementUnits, [field]: value });
   };
 
+  const handleFormNameChange = (e) => {
+    const value = e.target.value;
+    setFormName(value);
+    if (value.length === 0) {
+      setFormNameError("주문서 양식명은 필수입니다.");
+    } else {
+      setFormNameError("");
+    }
+  };
+
+  const validateForm = () => {
+    if (formName.length === 0) {
+      setFormNameError("주문서 양식명은 필수입니다.");
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
     try {
       const formData = {
         name: formName,
-        jacketSleeve: measurementUnits.자켓소매,
-        jacketLength: measurementUnits.자켓길이,
-        jacketForm: measurementUnits.자켓폼,
-        pantsCircumference: measurementUnits.바지둘레,
-        pantsLength: measurementUnits.바지길이,
-        shirtNeck: measurementUnits.셔츠목,
-        shirtSleeve: measurementUnits.셔츠소매,
-        dressBackForm: measurementUnits.드레스등폼,
-        dressLength: measurementUnits.드레스길이,
-        categories: selectedCategories.map((cat) => cat.categoryId),
+        ...Object.entries(measurementUnits).reduce((acc, [key, value]) => {
+          acc[measurementUnitMapping[key]] = value;
+          return acc;
+        }, {}),
+        categories: selectedCategories,
       };
-      // console.log(formData);
       await createFormMutation.mutateAsync(formData);
       setModalInfo({
         isOpen: true,
@@ -130,14 +153,22 @@ export const Create = () => {
           <>
             <div className={styles.sectionWrap}>
               <section className={styles.section}>
-                <label htmlFor="orderFormName">주문서 양식명</label>
+                <label htmlFor="orderFormName">
+                  주문서 양식명 <p className={styles.required}>*</p>
+                </label>
                 <Input
                   name="orderFormName"
                   type="text"
-                  className={styles.input}
+                  className={`${styles.input} ${
+                    formNameError ? styles.inputError : ""
+                  }`}
                   value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
+                  onChange={handleFormNameChange}
+                  required
                 />
+                {formNameError && (
+                  <p className={styles.errorMessage}>{formNameError}</p>
+                )}
               </section>
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>등록된 카테고리</h3>
@@ -150,16 +181,13 @@ export const Create = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedCategories.map((selectedCat) => (
-                        <tr key={selectedCat.id}>
+                      {selectedCategories.map((categoryId, index) => (
+                        <tr key={index}>
                           <td>
                             <select
-                              value={selectedCat.categoryId}
+                              value={categoryId}
                               onChange={(e) =>
-                                handleCategoryChange(
-                                  selectedCat.id,
-                                  e.target.value
-                                )
+                                handleCategoryChange(index, e.target.value)
                               }
                               className={styles.select}
                             >
@@ -172,7 +200,7 @@ export const Create = () => {
                           </td>
                           <td>
                             <Button
-                              onClick={() => removeCategory(selectedCat.id)}
+                              onClick={() => removeCategory(categoryId)}
                               className={styles.deleteButton}
                               variant="danger"
                             >
@@ -207,8 +235,8 @@ export const Create = () => {
                         }
                         className={styles.select}
                       >
-                        <option value="inch">inch</option>
-                        <option value="cm">cm</option>
+                        <option value="CM">CM</option>
+                        <option value="INCH">INCH</option>
                       </select>
                     </div>
                   ))}

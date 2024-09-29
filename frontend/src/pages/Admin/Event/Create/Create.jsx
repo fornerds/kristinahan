@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Input, Link } from "../../../../components";
 import { TabNavigation } from "../../../../modules";
@@ -16,24 +16,47 @@ export const Create = () => {
   const createEventMutation = useCreateEvent();
 
   const [eventName, setEventName] = useState("");
+  const [eventNameError, setEventNameError] = useState("");
   const [formId, setFormId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [inProgress, setInProgress] = useState(false);
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
     title: "",
     message: "",
   });
 
+  const validateEventName = useCallback((name) => {
+    if (name.trim().length === 0) {
+      setEventNameError("행사명은 필수입니다.");
+      return false;
+    }
+    setEventNameError("");
+    return true;
+  }, []);
+
+  const handleEventNameChange = useCallback(
+    (e) => {
+      const name = e.target.value;
+      setEventName(name);
+      validateEventName(name);
+    },
+    [validateEventName]
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateEventName(eventName)) {
+      return;
+    }
     try {
       await createEventMutation.mutateAsync({
         name: eventName,
         form_id: parseInt(formId),
         start_date: startDate,
         end_date: endDate,
-        inProgress: false,
+        inProgress: inProgress,
       });
       setModalInfo({
         isOpen: true,
@@ -44,7 +67,9 @@ export const Create = () => {
       setModalInfo({
         isOpen: true,
         title: "오류",
-        message: "행사 생성에 실패했습니다.",
+        message:
+          "행사 생성에 실패했습니다: " +
+          (error.response?.data?.detail || error.message),
       });
     }
   };
@@ -69,15 +94,22 @@ export const Create = () => {
           <form onSubmit={handleSubmit}>
             <div className={styles.sectionWrap}>
               <section className={styles.section}>
-                <label htmlFor="eventName">행사명</label>
+                <label htmlFor="eventName">
+                  행사명 <p className={styles.required}>*</p>
+                </label>
                 <Input
                   id="eventName"
                   type="text"
-                  className={styles.input}
+                  className={`${styles.input} ${
+                    eventNameError ? styles.inputError : ""
+                  }`}
                   value={eventName}
-                  onChange={(e) => setEventName(e.target.value)}
+                  onChange={handleEventNameChange}
                   required
                 />
+                {eventNameError && (
+                  <p className={styles.errorMessage}>{eventNameError}</p>
+                )}
               </section>
               <section className={styles.section}>
                 <label htmlFor="orderFormName">주문서 양식</label>
@@ -122,6 +154,18 @@ export const Create = () => {
                   />
                 </div>
               </section>
+              <section className={styles.section}>
+                <label htmlFor="inProgress">진행 상태</label>
+                <div className={styles.checkboxContainer}>
+                  <input
+                    type="checkbox"
+                    id="inProgress"
+                    checked={inProgress}
+                    onChange={(e) => setInProgress(e.target.checked)}
+                  />
+                  <label htmlFor="inProgress">진행 중</label>
+                </div>
+              </section>
             </div>
             <div className={styles.buttonGroup}>
               <Link className={styles.cancelLink} to="/admin/event">
@@ -131,6 +175,7 @@ export const Create = () => {
                 type="submit"
                 className={styles.saveButton}
                 label="저장"
+                // disabled={!eventName.trim()}
               />
             </div>
           </form>

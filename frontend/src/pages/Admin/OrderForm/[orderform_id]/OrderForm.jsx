@@ -12,10 +12,11 @@ import {
 } from "../../../../api/hooks";
 
 export const OrderForm = () => {
-  const { formID } = useParams();
+  const { orderform_id } = useParams();
   const navigate = useNavigate();
-  const { data: form, isLoading, isError } = useFormDetails(formID);
-  const { data: allCategories } = useCategories();
+  const { data: formData, isLoading, isError } = useFormDetails(orderform_id);
+  const { data: allCategoriesData, isLoading: isCategoriesLoading } =
+    useCategories();
   const updateFormMutation = useUpdateForm();
   const deleteFormMutation = useDeleteForm();
 
@@ -29,29 +30,48 @@ export const OrderForm = () => {
     message: "",
   });
 
+  const form = formData?.data;
+  const allCategories = allCategoriesData?.data;
+
+  console.log(form);
+
+  const measurementUnitMapping = {
+    자켓소매: "jacketSleeve",
+    자켓길이: "jacketLength",
+    자켓폼: "jacketForm",
+    바지둘레: "pantsCircumference",
+    바지길이: "pantsLength",
+    셔츠목: "shirtNeck",
+    셔츠소매: "shirtSleeve",
+    드레스등폼: "dressBackForm",
+    드레스길이: "dressLength",
+  };
+
   useEffect(() => {
     if (form) {
       setFormName(form.name);
+
+      // 카테고리 설정
       setSelectedCategories(form.categories);
-      setMeasurementUnits({
-        jacketSleeve: form.jacketSleeve,
-        jacketLength: form.jacketLength,
-        jacketForm: form.jacketForm,
-        pantsCircumference: form.pantsCircumference,
-        pantsLength: form.pantsLength,
-        shirtNeck: form.shirtNeck,
-        shirtSleeve: form.shirtSleeve,
-        dressBackForm: form.dressBackForm,
-        dressLength: form.dressLength,
-      });
+
+      // 수선 정보 설정
+      const initialMeasurementUnits = Object.entries(
+        measurementUnitMapping
+      ).reduce((acc, [key, value]) => {
+        acc[key] = form[value] ? form[value].toUpperCase() : "CM";
+        return acc;
+      }, {});
+      setMeasurementUnits(initialMeasurementUnits);
     }
   }, [form]);
 
   const addCategory = () => {
     if (allCategories && allCategories.length > 0) {
-      const newCategoryId = allCategories[0].id;
-      if (!selectedCategories.includes(newCategoryId)) {
-        setSelectedCategories([...selectedCategories, newCategoryId]);
+      const newCategory = allCategories.find(
+        (cat) => !selectedCategories.some((selected) => selected.id === cat.id)
+      );
+      if (newCategory) {
+        setSelectedCategories([...selectedCategories, newCategory]);
       }
     }
   };
@@ -60,36 +80,51 @@ export const OrderForm = () => {
     setSelectedCategories(selectedCategories.filter((_, i) => i !== index));
   };
 
-  const handleCategoryChange = (index, value) => {
-    const updatedCategories = [...selectedCategories];
-    updatedCategories[index] = Number(value);
-    setSelectedCategories(updatedCategories);
-  };
-
-  const handleMeasurementUnitChange = (field, value) => {
-    setMeasurementUnits({ ...measurementUnits, [field]: value });
+  const handleCategoryChange = (index, newCategoryId) => {
+    const newCategory = allCategories.find(
+      (cat) => cat.id === parseInt(newCategoryId)
+    );
+    if (newCategory) {
+      const updatedCategories = [...selectedCategories];
+      updatedCategories[index] = newCategory;
+      setSelectedCategories(updatedCategories);
+    }
   };
 
   const handleSave = async () => {
     try {
       const updatedForm = {
         name: formName,
-        ...measurementUnits,
-        categories: selectedCategories,
+        ...Object.entries(measurementUnits).reduce((acc, [key, value]) => {
+          acc[measurementUnitMapping[key]] = value.toLowerCase(); // API expects lowercase
+          return acc;
+        }, {}),
+        categories: selectedCategories.map((category) => category.id),
       };
-      await updateFormMutation.mutateAsync({ formID, formData: updatedForm });
+      // console.log(updatedForm);
+      await updateFormMutation.mutateAsync({
+        formId: orderform_id,
+        formData: updatedForm,
+      });
       setModalInfo({
         isOpen: true,
         title: "성공",
         message: "주문서 양식이 성공적으로 수정되었습니다.",
       });
     } catch (error) {
+      console.error("Update form error:", error);
       setModalInfo({
         isOpen: true,
         title: "오류",
-        message: "주문서 양식 수정에 실패했습니다: " + error.message,
+        message:
+          "주문서 양식 수정에 실패했습니다: " +
+          (error.response?.data?.detail || error.message),
       });
     }
+  };
+
+  const handleMeasurementUnitChange = (field, value) => {
+    setMeasurementUnits({ ...measurementUnits, [field]: value });
   };
 
   const handleDelete = () => {
@@ -98,20 +133,24 @@ export const OrderForm = () => {
 
   const confirmDelete = async () => {
     try {
-      await deleteFormMutation.mutateAsync(formID);
+      await deleteFormMutation.mutateAsync(orderform_id);
+      setIsDeleteModalOpen(false);
       setModalInfo({
         isOpen: true,
         title: "성공",
         message: "주문서 양식이 성공적으로 삭제되었습니다.",
       });
     } catch (error) {
+      console.error("Delete form error:", error);
+      setIsDeleteModalOpen(false);
       setModalInfo({
         isOpen: true,
         title: "오류",
-        message: "주문서 양식 삭제에 실패했습니다: " + error.message,
+        message:
+          "주문서 양식 삭제에 실패했습니다: " +
+          (error.response?.data?.detail || error.message),
       });
     }
-    setIsDeleteModalOpen(false);
   };
 
   const closeModal = () => {
@@ -121,15 +160,12 @@ export const OrderForm = () => {
     }
   };
 
-  if (isLoading) return <div>로딩 중...</div>;
-  if (isError) return <div>에러가 발생했습니다.</div>;
-
   return (
     <div className={styles.adminLayout}>
       <TabNavigation />
       <main className={styles.adminMainWrap}>
         <h2 className={styles.adminTitle}>주문서 양식 관리</h2>
-        {isLoading ? (
+        {isLoading || isCategoriesLoading ? (
           <div>로딩 중...</div>
         ) : isError ? (
           <div>에러가 발생했습니다.</div>
@@ -157,19 +193,19 @@ export const OrderForm = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedCategories.map((categoryId, index) => (
-                        <tr key={index}>
+                      {selectedCategories.map((category, index) => (
+                        <tr key={category.id}>
                           <td>
                             <select
-                              value={categoryId}
+                              value={category.id}
                               onChange={(e) =>
                                 handleCategoryChange(index, e.target.value)
                               }
                               className={styles.select}
                             >
-                              {allCategories?.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
+                              {allCategories?.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
                                 </option>
                               ))}
                             </select>
@@ -211,8 +247,8 @@ export const OrderForm = () => {
                         }
                         className={styles.select}
                       >
-                        <option value="inch">inch</option>
-                        <option value="cm">cm</option>
+                        <option value="INCH">inch</option>
+                        <option value="CM">cm</option>
                       </select>
                     </div>
                   ))}
@@ -240,12 +276,11 @@ export const OrderForm = () => {
           </>
         )}
       </main>
-
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         title="주문서 양식 삭제"
-        message="정말로 이 주문서 양식을 삭제하시겠습니까?"
+        message="이 주문서 양식을 삭제하시겠습니까?"
         confirmLabel="삭제"
         onConfirm={confirmDelete}
         cancelLabel="취소"

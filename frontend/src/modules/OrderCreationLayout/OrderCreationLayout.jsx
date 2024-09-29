@@ -7,7 +7,7 @@ import { Button, Link } from "../../components";
 import { Modal } from "../Modal";
 import { useEventDetails } from "../../api/hooks";
 
-export const OrderCreationLayout = ({ event_name }) => {
+export const OrderCreationLayout = () => {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const location = useLocation();
@@ -54,7 +54,7 @@ export const OrderCreationLayout = ({ event_name }) => {
               ? "Loading..."
               : eventError
               ? "이벤트 정보를 불러오는데 실패했습니다."
-              : `[${eventData?.event_name}] ${
+              : `[${eventData?.name}] ${
                   isEdit ? "주문서 수정" : "주문서 생성"
                 }`}
           </h2>

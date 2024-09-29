@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Button, Input } from "../../components";
-import styles from "./OrderForm.module.css";
-import { PaymentTable } from "./PaymentTable";
 import { useNavigate } from "react-router-dom";
+import { Button, Input } from "../../components";
+import { PaymentTable } from "./PaymentTable";
+import styles from "./OrderForm.module.css";
 import {
   useSaveOrder,
   useSaveTempOrder,
   useOrderDetails,
   useAuthors,
   useAffiliations,
+  useEventDetails,
 } from "../../api/hooks";
 
-// 주문 상태 매핑 객체
 const ORDER_STATUS_MAP = {
   Order_Completed: "주문완료",
   Packaging_Completed: "포장완료",
@@ -31,6 +31,7 @@ export const OrderForm = ({
   onComplete,
 }) => {
   const navigate = useNavigate();
+  const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: "",
@@ -61,12 +62,17 @@ export const OrderForm = ({
     },
   });
 
+  const eventData = event?.data;
+
   const [customerName, setCustomerName] = useState("");
   const [payerName, setPayerName] = useState("");
   const [isPayerSameAsCustomer, setIsPayerSameAsCustomer] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
   const [balanceTotal, setBalanceTotal] = useState(0);
-  const [productPrice, setProductPrice] = useState(0);
+  const [totalPrice, setTotalPrice] = useState(0);
+  const [selectedProducts, setSelectedProducts] = useState({});
+  const [groupedProducts, setGroupedProducts] = useState({});
+  const [contactNumber, setContactNumber] = useState("");
 
   const saveOrderMutation = useSaveOrder();
   const saveTempOrderMutation = useSaveTempOrder();
@@ -90,9 +96,20 @@ export const OrderForm = ({
       );
       setPrepaymentTotal(orderDetails.advancePayment);
       setBalanceTotal(orderDetails.balancePayment);
-      setProductPrice(orderDetails.totalPrice);
+      setTotalPrice(orderDetails.totalPrice);
     }
   }, [isEdit, orderDetails]);
+
+  useEffect(() => {
+    if (eventData && !isEdit) {
+      const grouped = eventData.categories.reduce((acc, category) => {
+        acc[category.id] = category.products;
+        return acc;
+      }, {});
+      setGroupedProducts(grouped);
+      // console.log("Grouped Products initialized:", grouped); // 로그: 초기화된 groupedProducts 확인
+    }
+  }, [eventData, isEdit]);
 
   useEffect(() => {
     if (isPayerSameAsCustomer) {
@@ -100,10 +117,42 @@ export const OrderForm = ({
     }
   }, [isPayerSameAsCustomer, customerName]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  // const handleInputChange = (e) => {
+  //   const { name, value } = e.target;
+  //   setFormData((prev) => ({ ...prev, [name]: value }));
+  // };
+
+  const handlePhoneInputChange = (e) => {
+    const { value } = e.target;
+    setContactNumber(value);
+    setFormData((prev) => ({ ...prev, contact: value }));
   };
+
+  const handleAuthorChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, author_id: value }));
+  };
+
+  const handleAffiliationChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, affiliation_id: value }));
+  };
+
+  const handleStatusChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, status: value }));
+  };
+
+  // const handleAlterationChange = (e) => {
+  //   const { name, value } = e.target;
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     alteration_details: {
+  //       ...prev.alteration_details,
+  //       [name]: value,
+  //     },
+  //   }));
+  // };
 
   const handleCustomerNameChange = useCallback(
     (e) => {
@@ -116,6 +165,26 @@ export const OrderForm = ({
     [isPayerSameAsCustomer]
   );
 
+  const handleAddressChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, address: value }));
+  };
+
+  const handleCollectionMethodChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, collectionMethod: value }));
+  };
+
+  const handleOrderNotesChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, notes: value }));
+  };
+
+  const handlePaymentNotesChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, paymentNotes: value }));
+  };
+
   const handlePayerCheckboxChange = useCallback(
     (e) => {
       setIsPayerSameAsCustomer(e.target.checked);
@@ -126,48 +195,113 @@ export const OrderForm = ({
     [customerName]
   );
 
-  const handleProductChange = useCallback((id, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      orderItems: prev.orderItems.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      ),
-    }));
-  }, []);
+  const handleProductChange = useCallback(
+    (categoryId, field, value) => {
+      // console.log(
+      //   `Change detected - Category: ${categoryId}, Field: ${field}, Value: ${value}, Type of Value: ${typeof value}`
+      // ); // 로그: 입력 변경 사항 및 타입 확인
+
+      setSelectedProducts((prev) => {
+        const newState = {
+          ...prev,
+          [categoryId]: {
+            ...prev[categoryId],
+            [field]: value,
+          },
+        };
+
+        if (field === "productId") {
+          // productId가 문자열로 들어온 경우 숫자로 변환하여 비교
+          const productId = parseInt(value, 10);
+          const selectedProduct = groupedProducts[categoryId]?.find(
+            (p) => p.id === productId
+          );
+
+          // console.log("Selected Product after change:", selectedProduct); // 로그: 변경 후 선택된 상품 확인
+
+          if (selectedProduct) {
+            newState[categoryId].price = selectedProduct.price;
+            newState[categoryId].quantity = 0;
+            newState[categoryId].attributes = "";
+            newState[categoryId].sizes = selectedProduct.attributes.map(
+              (attr) => ({
+                id: attr.attribute_id,
+                value: attr.value,
+              })
+            );
+          }
+        }
+
+        return newState;
+      });
+    },
+    [groupedProducts]
+  );
+
+  useEffect(() => {
+    const newTotalPrice = Object.values(selectedProducts).reduce(
+      (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+      0
+    );
+    setTotalPrice(newTotalPrice);
+    setFormData((prev) => ({ ...prev, totalPrice: newTotalPrice }));
+  }, [selectedProducts]);
 
   const handleSubmit = async (isTemp = false) => {
+    const orderItems = Object.entries(selectedProducts)
+      .map(([categoryId, item]) => {
+        const product = groupedProducts[categoryId]?.find(
+          (p) => p.id === item.productId
+        );
+        return {
+          product_id: item.productId,
+          quantity: item.quantity,
+          attributes: item.attributes,
+          price: product ? product.price : 0,
+        };
+      })
+      .filter((item) => item.product_id);
+
     const orderData = {
       ...formData,
       isTemporary: isTemp,
       payments: [...formData.payments, { payerName: payerName }],
-      totalPrice: productPrice,
+      totalPrice: totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
+      orderItems: orderItems,
     };
 
-    try {
-      if (isTemp) {
-        await saveTempOrderMutation.mutateAsync({
-          orderData,
-          isUpdate: isEdit,
-        });
-        onSave();
-      } else {
-        await saveOrderMutation.mutateAsync({
-          orderData,
-          isUpdate: isEdit,
-          isTemp: false,
-        });
-        onComplete();
-      }
-      navigate(`/event/${event_id}`);
-    } catch (error) {
-      console.error("Order save failed:", error);
-      // 에러 처리 로직
-    }
+    console.log(orderData);
+
+    // try {
+    //   if (isTemp) {
+    //     await saveTempOrderMutation.mutateAsync({
+    //       orderData,
+    //       isUpdate: isEdit,
+    //     });
+    //     onSave();
+    //   } else {
+    //     await saveOrderMutation.mutateAsync({
+    //       orderData,
+    //       isUpdate: isEdit,
+    //       isTemp: false,
+    //     });
+    //     onComplete();
+    //   }
+    //   navigate(`/event/${event_id}`);
+    // } catch (error) {
+    //   console.error("Order save failed:", error);
+    //   // 에러 처리 로직
+    // }
   };
 
-  if (isLoadingOrderDetails || isLoadingAuthors || isLoadingAffiliations)
+  if (
+    isLoadingOrderDetails ||
+    isLoadingAuthors ||
+    isLoadingAffiliations ||
+    isEventLoading
+  )
     return <div>Loading...</div>;
   if (orderDetailsError)
     return <div>Error loading order details: {orderDetailsError.message}</div>;
@@ -190,7 +324,7 @@ export const OrderForm = ({
             <select
               name="author_id"
               id={styles.writer}
-              onChange={handleInputChange}
+              onChange={handleAuthorChange}
               value={formData.author_id}
             >
               <option value="">작성자 선택</option>
@@ -240,7 +374,7 @@ export const OrderForm = ({
                   id={value}
                   value={value}
                   checked={formData.status === value}
-                  onChange={handleInputChange}
+                  onChange={handleStatusChange}
                 />
                 <label htmlFor={value}>{label}</label>
               </React.Fragment>
@@ -265,11 +399,11 @@ export const OrderForm = ({
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>
             <Input
-              type="tel"
+              type="text"
               className={styles.textInput}
               name="contact"
               value={formData.contact}
-              onChange={handleInputChange}
+              onChange={handlePhoneInputChange}
             />
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -278,7 +412,7 @@ export const OrderForm = ({
               name="affiliation_id"
               id={styles.relation}
               value={formData.affiliation_id}
-              onChange={handleInputChange}
+              onChange={handleAffiliationChange}
             >
               <option value="">소속 선택</option>
               {affiliations?.data &&
@@ -299,7 +433,7 @@ export const OrderForm = ({
               className={styles.addressInput}
               name="address"
               value={formData.address}
-              onChange={handleInputChange}
+              onChange={handleAddressChange}
             />
           </div>
 
@@ -309,7 +443,7 @@ export const OrderForm = ({
               name="collectionMethod"
               id={styles.takeout}
               value={formData.collectionMethod}
-              onChange={handleInputChange}
+              onChange={handleCollectionMethodChange}
             >
               <option value="Delivery">배송</option>
               <option value="Pickup on site">현장수령 (기혼 불가)</option>
@@ -326,7 +460,7 @@ export const OrderForm = ({
               id="optionalMessage"
               className={styles.optionalMessage}
               value={formData.notes}
-              onChange={handleInputChange}
+              onChange={handleOrderNotesChange}
             ></textarea>
           </div>
         </div>
@@ -334,61 +468,80 @@ export const OrderForm = ({
 
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>상품정보</h3>
-
         <table className={styles.table}>
           <thead>
             <tr>
               <th scope="col">카테고리</th>
-              <th scope="col">상품종류</th>
+              <th scope="col">상품명</th>
               <th scope="col">사이즈</th>
               <th scope="col">개수</th>
+              <th scope="col">가격</th>
             </tr>
           </thead>
           <tbody>
-            {formData.orderItems.map((item) => (
-              <tr key={item.id}>
-                <td>{item.category}</td>
+            {eventData?.categories.map((category) => (
+              <tr key={category.id}>
+                <td>{category.name}</td>
                 <td>
                   <select
-                    name="types"
-                    id={styles.types}
-                    value={item.type}
+                    value={selectedProducts[category.id]?.productId || ""}
                     onChange={(e) =>
-                      handleProductChange(item.id, "type", e.target.value)
+                      handleProductChange(
+                        category.id,
+                        "productId",
+                        e.target.value
+                      )
                     }
                   >
-                    {item.availableTypes.map((type, index) => (
-                      <option key={index} value={type}>
-                        {type}
+                    <option value="">선택</option>
+                    {groupedProducts[category.id]?.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
                       </option>
                     ))}
                   </select>
                 </td>
                 <td>
                   <select
-                    name="sizes"
-                    id={styles.sizes}
-                    value={item.size}
+                    value={selectedProducts[category.id]?.attributes || ""}
                     onChange={(e) =>
-                      handleProductChange(item.id, "size", e.target.value)
+                      handleProductChange(
+                        category.id,
+                        "attributes",
+                        e.target.value
+                      )
                     }
+                    disabled={!selectedProducts[category.id]?.productId}
                   >
-                    {item.availableSizes.map((size, index) => (
-                      <option key={index} value={size}>
-                        {size}
+                    <option value="">선택</option>
+                    {selectedProducts[category.id]?.sizes?.map((size) => (
+                      <option key={size.id} value={size.value}>
+                        {size.value}
                       </option>
                     ))}
                   </select>
                 </td>
                 <td>
                   <Input
-                    className={styles.numberInput}
                     type="number"
-                    value={item.quantity}
+                    min="0"
+                    value={selectedProducts[category.id]?.quantity || 0}
                     onChange={(e) =>
-                      handleProductChange(item.id, "quantity", e.target.value)
+                      handleProductChange(
+                        category.id,
+                        "quantity",
+                        parseInt(e.target.value, 10)
+                      )
                     }
+                    disabled={!selectedProducts[category.id]?.productId}
                   />
+                </td>
+                <td>
+                  {(
+                    (selectedProducts[category.id]?.price || 0) *
+                    (selectedProducts[category.id]?.quantity || 0)
+                  ).toLocaleString()}{" "}
+                  원
                 </td>
               </tr>
             ))}
@@ -451,7 +604,7 @@ export const OrderForm = ({
               id="currencyOptionalMessage"
               className={styles.optionalMessage}
               value={formData.paymentNotes || ""}
-              onChange={handleInputChange}
+              onChange={handlePaymentNotesChange}
             ></textarea>
           </div>
         </div>
@@ -459,7 +612,7 @@ export const OrderForm = ({
         <div className={styles.calculator}>
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>상품 가격</h4>
-            <p>{productPrice.toLocaleString()} 원</p>
+            <p>{totalPrice.toLocaleString()} 원</p>
           </div>
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>선급금 총액</h4>
@@ -473,7 +626,7 @@ export const OrderForm = ({
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>총 잔액</h4>
             <p className={styles.rest}>
-              {(productPrice - prepaymentTotal - balanceTotal).toLocaleString()}{" "}
+              {(totalPrice - prepaymentTotal - balanceTotal).toLocaleString()}{" "}
               원
             </p>
           </div>
@@ -502,7 +655,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.jacketSleeve}
             </div>
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -523,7 +676,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.jacketLength}
             </div>
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -544,7 +697,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.jacketForm}
             </div>
           </div>
         </div>
@@ -568,7 +721,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.shirtNeck}
             </div>
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -589,7 +742,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.shirtSleeve}
             </div>
           </div>
         </div>
@@ -613,7 +766,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.pantsCircumference}
             </div>
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -634,7 +787,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.pantsLength}
             </div>
           </div>
         </div>
@@ -658,7 +811,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.dressBackForm}
             </div>
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -679,7 +832,7 @@ export const OrderForm = ({
                   }))
                 }
               />
-              cm
+              {eventData?.form.dressLength}
             </div>
           </div>
         </div>

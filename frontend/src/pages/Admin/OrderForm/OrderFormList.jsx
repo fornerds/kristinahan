@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Button, Link } from "../../../components";
 import { TabNavigation, Modal } from "../../../modules";
 import styles from "./OrderFormList.module.css";
-import { useForms, useCreateForm } from "../../../api/hooks";
+import { useForms, useDuplicateForm } from "../../../api/hooks";
 
 export const OrderFormList = () => {
   const navigate = useNavigate();
   const { data: forms, isLoading, isError } = useForms();
-  const createFormMutation = useCreateForm();
+  const duplicateFormMutation = useDuplicateForm();
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
     title: "",
@@ -19,21 +19,14 @@ export const OrderFormList = () => {
     navigate(`/admin/orderform/${id}`);
   };
 
-  const handleCopyClick = async (e, form) => {
+  const handleCopyClick = async (e, formId) => {
     e.stopPropagation(); // 이벤트 버블링 방지
     try {
-      const newFormName = `${form.name} 복제본`;
-      const newForm = {
-        ...form,
-        name: newFormName,
-        id: undefined, // 새 ID를 위해 제거
-        created_at: undefined, // 새 생성 시간을 위해 제거
-      };
-      await createFormMutation.mutateAsync(newForm);
+      const result = await duplicateFormMutation.mutateAsync(formId);
       setModalInfo({
         isOpen: true,
         title: "성공",
-        message: `'${newFormName}' 주문서 양식이 성공적으로 복제되었습니다.`,
+        message: `'${result?.data.name}' 주문서 양식이 성공적으로 복제되었습니다.`,
       });
     } catch (error) {
       setModalInfo({
@@ -42,6 +35,11 @@ export const OrderFormList = () => {
         message: "주문서 양식 복제에 실패했습니다: " + error.message,
       });
     }
+  };
+
+  const formatCategories = (categories) => {
+    if (!categories || categories.length === 0) return "";
+    return categories.map((cat) => cat.name).join(", ");
   };
 
   const closeModal = () => {
@@ -53,17 +51,20 @@ export const OrderFormList = () => {
       <TabNavigation />
       <main className={styles.adminMainWrap}>
         <h2 className={styles.adminTitle}>주문서 양식 관리</h2>
-        <section className={styles.section}>
-          <div className={styles.actionButtonsWrap}>
-            <Link to="/admin/orderform/create" className={styles.newOrderForm}>
-              + 주문서양식 추가하기
-            </Link>
-          </div>
-          {isLoading ? (
-            <div>로딩 중...</div>
-          ) : isError ? (
-            <div>에러가 발생했습니다.</div>
-          ) : (
+        {isLoading ? (
+          <div>로딩 중...</div>
+        ) : isError ? (
+          <div>에러가 발생했습니다.</div>
+        ) : (
+          <section className={styles.section}>
+            <div className={styles.actionButtonsWrap}>
+              <Link
+                to="/admin/orderform/create"
+                className={styles.newOrderForm}
+              >
+                + 주문서양식 추가하기
+              </Link>
+            </div>
             <table className={styles.table}>
               <thead>
                 <tr>
@@ -81,11 +82,11 @@ export const OrderFormList = () => {
                     style={{ cursor: "pointer" }}
                   >
                     <td>{form.name}</td>
-                    <td>{form.categories.join(", ")}</td>
+                    <td>{formatCategories(form.categories)}</td>
                     <td>{new Date(form.created_at).toLocaleDateString()}</td>
                     <td>
                       <Button
-                        onClick={(e) => handleCopyClick(e, form)}
+                        onClick={(e) => handleCopyClick(e, form.id)}
                         label="복제"
                         className={styles.copyButton}
                       />
@@ -94,8 +95,8 @@ export const OrderFormList = () => {
                 ))}
               </tbody>
             </table>
-          )}
-        </section>
+          </section>
+        )}
       </main>
       <Modal
         isOpen={modalInfo.isOpen}

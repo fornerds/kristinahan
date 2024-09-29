@@ -13,8 +13,16 @@ import {
 export const Event = () => {
   const { event_id } = useParams();
   const navigate = useNavigate();
-  const { data: event, isLoading, isError } = useEventDetails(event_id);
-  const { data: forms } = useForms();
+  const {
+    data: eventData,
+    isLoading: isEventLoading,
+    isError: isEventError,
+  } = useEventDetails(event_id);
+  const {
+    data: formsData,
+    isLoading: isFormsLoading,
+    isError: isFormsError,
+  } = useForms();
   const updateEventMutation = useUpdateEvent();
   const deleteEventMutation = useDeleteEvent();
 
@@ -22,6 +30,7 @@ export const Event = () => {
   const [formId, setFormId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [inProgress, setInProgress] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
@@ -29,12 +38,26 @@ export const Event = () => {
     message: "",
   });
 
+  const event = eventData?.data;
+  const forms = formsData?.data || [];
+
+  // console.log(event);
+
   useEffect(() => {
     if (event) {
-      setEventName(event.name);
-      setFormId(event.form_id.toString());
-      setStartDate(event.start_date);
-      setEndDate(event.end_date);
+      setEventName(event.name || "");
+      setFormId(event.form?.id.toString() || "");
+      setStartDate(
+        event.start_date
+          ? new Date(event.start_date).toISOString().split("T")[0]
+          : ""
+      );
+      setEndDate(
+        event.end_date
+          ? new Date(event.end_date).toISOString().split("T")[0]
+          : ""
+      );
+      setInProgress(event.inProgress || false);
     }
   }, [event]);
 
@@ -48,7 +71,7 @@ export const Event = () => {
           form_id: parseInt(formId),
           start_date: startDate,
           end_date: endDate,
-          inProgress: event.inProgress,
+          inProgress: inProgress,
         },
       });
       setModalInfo({
@@ -60,7 +83,8 @@ export const Event = () => {
       setModalInfo({
         isOpen: true,
         title: "오류",
-        message: "행사 수정에 실패했습니다.",
+        message:
+          "행사 수정에 실패했습니다: " + (error.message || "알 수 없는 오류"),
       });
     }
   };
@@ -99,10 +123,9 @@ export const Event = () => {
       <TabNavigation />
       <main className={styles.adminMainWrap}>
         <h2 className={styles.adminTitle}>행사 수정</h2>
-
-        {isLoading ? (
+        {isEventLoading || isFormsLoading ? (
           <div>로딩 중...</div>
-        ) : isError ? (
+        ) : isEventError || isFormsError ? (
           <div>에러가 발생했습니다.</div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -121,13 +144,14 @@ export const Event = () => {
               <section className={styles.section}>
                 <label htmlFor="orderFormName">주문서 양식</label>
                 <select
-                  name="orderFormName"
-                  id={styles.orderFormName}
+                  id="orderFormName"
+                  className={styles.select}
                   value={formId}
                   onChange={(e) => setFormId(e.target.value)}
                   required
                 >
-                  {forms?.data.map((form) => (
+                  <option value="">선택하세요</option>
+                  {forms.map((form) => (
                     <option key={form.id} value={form.id}>
                       {form.name}
                     </option>
@@ -158,6 +182,18 @@ export const Event = () => {
                     onChange={(e) => setEndDate(e.target.value)}
                     required
                   />
+                </div>
+              </section>
+              <section className={styles.section}>
+                <label htmlFor="inProgress">진행 상태</label>
+                <div className={styles.checkboxContainer}>
+                  <input
+                    type="checkbox"
+                    id="inProgress"
+                    checked={inProgress}
+                    onChange={(e) => setInProgress(e.target.checked)}
+                  />
+                  <label htmlFor="inProgress">진행 중</label>
                 </div>
               </section>
             </div>
