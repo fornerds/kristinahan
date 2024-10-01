@@ -167,3 +167,13 @@
   justify-content: end;
   margin-top: 22px;
 }
+
+.statusWrap {
+  flex-wrap: wrap;
+}
+
+.statusLable {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}

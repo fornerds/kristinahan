@@ -49,7 +49,7 @@ function App() {
           <Route path="/admin/affiliation" element={<AffiliationList />} />
           <Route path="/admin/order" element={<AdminOrderList />} />
           <Route
-            path="/admin/order/create/:event_id"
+            path="/admin/order/:event_id/create"
             element={<AdminOrderCreate />}
           />
           <Route

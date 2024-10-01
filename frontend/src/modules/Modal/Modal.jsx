@@ -54,13 +54,13 @@ export const EventSelectionModal = ({
   onClose,
   onSelectEvent,
   events,
+  navigate,
 }) => {
   const [selectedEventId, setSelectedEventId] = useState("");
 
   const handleSelectEvent = () => {
-    const selectedEvent = events.find((event) => event.id === selectedEventId);
-    if (selectedEvent) {
-      onSelectEvent(selectedEvent.id, selectedEvent.name);
+    if (selectedEventId) {
+      navigate(`/admin/order/${selectedEventId}/create`);
     }
     onClose();
   };

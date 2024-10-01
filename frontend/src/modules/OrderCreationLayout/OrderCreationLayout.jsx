@@ -15,9 +15,7 @@ export const OrderCreationLayout = () => {
   const { event_id, order_id } = useParams();
 
   const isEdit = !!order_id;
-  const isAdminOrderCreate = location.pathname.startsWith(
-    "/admin/order/create"
-  );
+  const isAdminOrderCreate = location.pathname.startsWith("/admin/order");
   const backLink = isAdminOrderCreate ? "/admin/order" : `/event/${event_id}`;
 
   const handleSave = () => {

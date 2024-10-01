@@ -19,7 +19,7 @@ export const OrderEditLayout = ({ event_name }) => {
   const backLink = isAdminOrderCreate ? "/admin/order" : `/event/${event_id}`;
 
   const handleSave = () => {
-    // 임시 저장 로직
+    setIsConfirmModalOpen(true);
   };
 
   const handlePrint = () => {

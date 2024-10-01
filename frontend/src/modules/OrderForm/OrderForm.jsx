@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button, Input } from "../../components";
-import { PaymentTable } from "./PaymentTable";
+import PaymentTable from "./PaymentTable/PaymentTable";
 import styles from "./OrderForm.module.css";
 import {
   useSaveOrder,
@@ -30,7 +29,6 @@ export const OrderForm = ({
   onSave,
   onComplete,
 }) => {
-  const navigate = useNavigate();
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -72,7 +70,36 @@ export const OrderForm = ({
   const [totalPrice, setTotalPrice] = useState(0);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [groupedProducts, setGroupedProducts] = useState({});
-  const [contactNumber, setContactNumber] = useState("");
+  const [payments, setPayments] = useState([
+    {
+      payment_date: new Date().toISOString(),
+      paymentMethod: "advance",
+      cashAmount: 0,
+      cashCurrency: "KRW",
+      cashConvertedAmount: 0,
+      cardAmount: 0,
+      cardCurrency: "KRW",
+      cardConvertedAmount: 0,
+      tradeInAmount: 0,
+      tradeInCurrency: "GOLD_24K",
+      tradeInConvertedAmount: 0,
+      notes: "",
+    },
+    {
+      payment_date: new Date().toISOString(),
+      paymentMethod: "balance",
+      cashAmount: 0,
+      cashCurrency: "KRW",
+      cashConvertedAmount: 0,
+      cardAmount: 0,
+      cardCurrency: "KRW",
+      cardConvertedAmount: 0,
+      tradeInAmount: 0,
+      tradeInCurrency: "GOLD_24K",
+      tradeInConvertedAmount: 0,
+      notes: "",
+    },
+  ]);
 
   const saveOrderMutation = useSaveOrder();
   const saveTempOrderMutation = useSaveTempOrder();
@@ -107,7 +134,7 @@ export const OrderForm = ({
         return acc;
       }, {});
       setGroupedProducts(grouped);
-      // console.log("Grouped Products initialized:", grouped); // 로그: 초기화된 groupedProducts 확인
+      console.log("Grouped Products initialized:", grouped); // 로그: 초기화된 groupedProducts 확인
     }
   }, [eventData, isEdit]);
 
@@ -117,25 +144,9 @@ export const OrderForm = ({
     }
   }, [isPayerSameAsCustomer, customerName]);
 
-  // const handleInputChange = (e) => {
-  //   const { name, value } = e.target;
-  //   setFormData((prev) => ({ ...prev, [name]: value }));
-  // };
-
-  const handlePhoneInputChange = (e) => {
-    const { value } = e.target;
-    setContactNumber(value);
-    setFormData((prev) => ({ ...prev, contact: value }));
-  };
-
-  const handleAuthorChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, author_id: value }));
-  };
-
-  const handleAffiliationChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, affiliation_id: value }));
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleStatusChange = (e) => {
@@ -143,27 +154,15 @@ export const OrderForm = ({
     setFormData((prev) => ({ ...prev, status: value }));
   };
 
-  // const handleAlterationChange = (e) => {
-  //   const { name, value } = e.target;
-  //   setFormData((prev) => ({
-  //     ...prev,
-  //     alteration_details: {
-  //       ...prev.alteration_details,
-  //       [name]: value,
-  //     },
-  //   }));
-  // };
+  const handleContactChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, contact: value }));
+  };
 
-  const handleCustomerNameChange = useCallback(
-    (e) => {
-      setCustomerName(e.target.value);
-      setFormData((prev) => ({ ...prev, orderName: e.target.value }));
-      if (isPayerSameAsCustomer) {
-        setPayerName(e.target.value);
-      }
-    },
-    [isPayerSameAsCustomer]
-  );
+  const handleAffiliationChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, affiliation_id: value }));
+  };
 
   const handleAddressChange = (e) => {
     const { value } = e.target;
@@ -175,15 +174,48 @@ export const OrderForm = ({
     setFormData((prev) => ({ ...prev, collectionMethod: value }));
   };
 
-  const handleOrderNotesChange = (e) => {
+  const handleNotesChange = (e) => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
-  const handlePaymentNotesChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, paymentNotes: value }));
+  const handlePaymentChange = useCallback(
+    (index) => (updatedPayment) => {
+      setPayments((prev) => {
+        const newPayments = [...prev];
+        newPayments[index] = {
+          ...updatedPayment,
+          cashConvertedAmount: Number(updatedPayment.cashConvertedAmount) || 0,
+          cardConvertedAmount: Number(updatedPayment.cardConvertedAmount) || 0,
+          tradeInConvertedAmount:
+            Number(updatedPayment.tradeInConvertedAmount) || 0,
+        };
+        return newPayments;
+      });
+    },
+    []
+  );
+
+  const handleAlterationChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      alteration_details: {
+        ...prev.alteration_details,
+        [field]: value,
+      },
+    }));
   };
+
+  const handleCustomerNameChange = useCallback(
+    (e) => {
+      setCustomerName(e.target.value);
+      setFormData((prev) => ({ ...prev, orderName: e.target.value }));
+      if (isPayerSameAsCustomer) {
+        setPayerName(e.target.value);
+      }
+    },
+    [isPayerSameAsCustomer]
+  );
 
   const handlePayerCheckboxChange = useCallback(
     (e) => {
@@ -221,7 +253,7 @@ export const OrderForm = ({
 
           if (selectedProduct) {
             newState[categoryId].price = selectedProduct.price;
-            newState[categoryId].quantity = 0;
+            newState[categoryId].quantity = 1;
             newState[categoryId].attributes = "";
             newState[categoryId].sizes = selectedProduct.attributes.map(
               (attr) => ({
@@ -237,6 +269,32 @@ export const OrderForm = ({
     },
     [groupedProducts]
   );
+
+  useEffect(() => {
+    const calculateTotal = (payment) => {
+      const cash = Number(payment.cashConvertedAmount) || 0;
+      const card = Number(payment.cardConvertedAmount) || 0;
+      const tradeIn = Number(payment.tradeInConvertedAmount) || 0;
+      return cash + card + tradeIn;
+    };
+
+    const advance =
+      payments.find((p) => p.paymentMethod === "advance") || payments[0];
+    const balance =
+      payments.find((p) => p.paymentMethod === "balance") || payments[1];
+
+    const advanceTotal = calculateTotal(advance);
+    const balanceTotal = calculateTotal(balance);
+
+    setFormData((prev) => ({
+      ...prev,
+      advancePayment: advanceTotal,
+      balancePayment: balanceTotal,
+    }));
+
+    setPrepaymentTotal(advanceTotal);
+    setBalanceTotal(balanceTotal);
+  }, [payments]);
 
   useEffect(() => {
     const newTotalPrice = Object.values(selectedProducts).reduce(
@@ -262,17 +320,43 @@ export const OrderForm = ({
       })
       .filter((item) => item.product_id);
 
+    const advance =
+      payments.find((p) => p.paymentMethod === "advance") || payments[0];
+    const balance =
+      payments.find((p) => p.paymentMethod === "balance") || payments[1];
+
     const orderData = {
       ...formData,
-      isTemporary: isTemp,
-      payments: [...formData.payments, { payerName: payerName }],
+      event_id: parseInt(event_id, 10),
+      author_id: parseInt(formData.author_id, 10),
+      modifier_id: parseInt(formData.author_id, 10),
+      affiliation_id: parseInt(formData.affiliation_id, 10),
       totalPrice: totalPrice,
-      advancePayment: prepaymentTotal,
-      balancePayment: balanceTotal,
+      advancePayment: formData.advancePayment,
+      advancePaymentDate: payments[0].payment_date,
+      balancePayment: formData.balancePayment,
+      balancePaymentDate: payments[1].payment_date,
       orderItems: orderItems,
+      payments: payments.map((payment) => ({
+        payment_date: payment.payment_date,
+        paymentMethod: payment.paymentMethod,
+        cashAmount: payment.cashAmount,
+        cashCurrency: payment.cashCurrency,
+        cashConvertedAmount: payment.cashConvertedAmount,
+        cardAmount: payment.cardAmount,
+        cardCurrency: payment.cardCurrency,
+        cardConvertedAmount: payment.cardConvertedAmount,
+        tradeInAmount: payment.tradeInAmount,
+        tradeInCurrency: payment.tradeInCurrency,
+        tradeInConvertedAmount: payment.tradeInConvertedAmount,
+        notes: payment.notes,
+      })),
     };
 
     console.log(orderData);
+    console.log(
+      "아직 수정중에 있습니다. 데이터 반환을 확인 작업을 위해 임시로 생성 API를 막아두겠습니다."
+    );
 
     // try {
     //   if (isTemp) {
@@ -324,7 +408,7 @@ export const OrderForm = ({
             <select
               name="author_id"
               id={styles.writer}
-              onChange={handleAuthorChange}
+              onChange={handleInputChange}
               value={formData.author_id}
             >
               <option value="">작성자 선택</option>
@@ -365,9 +449,9 @@ export const OrderForm = ({
         <div className={styles.sectionGroupWrap}>
           <h4 className={styles.sectionLabel}>주문상태</h4>
 
-          <form className={styles.sectionGroup}>
+          <form className={`${styles.sectionGroup} ${styles.statusWrap}`}>
             {Object.entries(ORDER_STATUS_MAP).map(([value, label]) => (
-              <React.Fragment key={value}>
+              <div key={value} className={styles.statusLable}>
                 <input
                   type="radio"
                   name="status"
@@ -377,7 +461,7 @@ export const OrderForm = ({
                   onChange={handleStatusChange}
                 />
                 <label htmlFor={value}>{label}</label>
-              </React.Fragment>
+              </div>
             ))}
           </form>
         </div>
@@ -399,11 +483,11 @@ export const OrderForm = ({
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>
             <Input
-              type="text"
+              type="tel"
               className={styles.textInput}
               name="contact"
               value={formData.contact}
-              onChange={handlePhoneInputChange}
+              onChange={handleContactChange}
             />
           </div>
           <div className={styles.sectionVerticalGroup}>
@@ -460,7 +544,7 @@ export const OrderForm = ({
               id="optionalMessage"
               className={styles.optionalMessage}
               value={formData.notes}
-              onChange={handleOrderNotesChange}
+              onChange={handleNotesChange}
             ></textarea>
           </div>
         </div>
@@ -525,7 +609,7 @@ export const OrderForm = ({
                   <Input
                     type="number"
                     min="0"
-                    value={selectedProducts[category.id]?.quantity || 0}
+                    value={selectedProducts[category.id]?.quantity || 1}
                     onChange={(e) =>
                       handleProductChange(
                         category.id,
@@ -553,18 +637,12 @@ export const OrderForm = ({
         <h3 className={styles.sectionTitle}>결제정보</h3>
 
         <PaymentTable
-          title="선급금"
-          onTotalChange={setPrepaymentTotal}
-          payments={formData.payments.filter(
-            (p) => p.paymentMethod === "advance"
-          )}
+          payment={payments[0]}
+          onPaymentChange={handlePaymentChange(0)}
         />
         <PaymentTable
-          title="잔금"
-          onTotalChange={setBalanceTotal}
-          payments={formData.payments.filter(
-            (p) => p.paymentMethod === "balance"
-          )}
+          payment={payments[1]}
+          onPaymentChange={handlePaymentChange(1)}
         />
 
         <div className={styles.sectionValueWrap}>
@@ -596,26 +674,13 @@ export const OrderForm = ({
           </div>
         </div>
 
-        <div className={styles.sectionValueWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>기타사항</h4>
-            <textarea
-              name="paymentNotes"
-              id="currencyOptionalMessage"
-              className={styles.optionalMessage}
-              value={formData.paymentNotes || ""}
-              onChange={handlePaymentNotesChange}
-            ></textarea>
-          </div>
-        </div>
-
         <div className={styles.calculator}>
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>상품 가격</h4>
             <p>{totalPrice.toLocaleString()} 원</p>
           </div>
           <div className={styles.spacebetween}>
-            <h4 className={styles.sectionLabel}>선급금 총액</h4>
+            <h4 className={styles.sectionLabel}>선입금 총액</h4>
             <p className={styles.paid}>{prepaymentTotal.toLocaleString()} 원</p>
           </div>
           <div className={styles.spacebetween}>
@@ -646,13 +711,7 @@ export const OrderForm = ({
                 name="jacketSleeve"
                 value={formData.alteration_details.jacketSleeve}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      jacketSleeve: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("jacketSleeve", e.target.value)
                 }
               />
               {eventData?.form.jacketSleeve}
@@ -667,13 +726,7 @@ export const OrderForm = ({
                 name="jacketLength"
                 value={formData.alteration_details.jacketLength}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      jacketLength: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("jacketLength", e.target.value)
                 }
               />
               {eventData?.form.jacketLength}
@@ -688,13 +741,7 @@ export const OrderForm = ({
                 name="jacketForm"
                 value={formData.alteration_details.jacketForm}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      jacketForm: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("jacketForm", e.target.value)
                 }
               />
               {eventData?.form.jacketForm}
@@ -712,13 +759,7 @@ export const OrderForm = ({
                 name="shirtNeck"
                 value={formData.alteration_details.shirtNeck}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      shirtNeck: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("shirtNeck", e.target.value)
                 }
               />
               {eventData?.form.shirtNeck}
@@ -733,13 +774,7 @@ export const OrderForm = ({
                 name="shirtSleeve"
                 value={formData.alteration_details.shirtSleeve}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      shirtSleeve: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("shirtSleeve", e.target.value)
                 }
               />
               {eventData?.form.shirtSleeve}
@@ -757,13 +792,7 @@ export const OrderForm = ({
                 name="pantsCircumference"
                 value={formData.alteration_details.pantsCircumference}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      pantsCircumference: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("pantsCircumference", e.target.value)
                 }
               />
               {eventData?.form.pantsCircumference}
@@ -778,13 +807,7 @@ export const OrderForm = ({
                 name="pantsLength"
                 value={formData.alteration_details.pantsLength}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      pantsLength: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("pantsLength", e.target.value)
                 }
               />
               {eventData?.form.pantsLength}
@@ -802,13 +825,7 @@ export const OrderForm = ({
                 name="dressBackForm"
                 value={formData.alteration_details.dressBackForm}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      dressBackForm: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("dressBackForm", e.target.value)
                 }
               />
               {eventData?.form.dressBackForm}
@@ -823,13 +840,7 @@ export const OrderForm = ({
                 name="dressLength"
                 value={formData.alteration_details.dressLength}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    alteration_details: {
-                      ...prev.alteration_details,
-                      dressLength: e.target.value,
-                    },
-                  }))
+                  handleAlterationChange("dressLength", e.target.value)
                 }
               />
               {eventData?.form.dressLength}
@@ -845,15 +856,7 @@ export const OrderForm = ({
               id="dressOptionalMessage"
               className={styles.optionalMessage}
               value={formData.alteration_details.notes}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  alteration_details: {
-                    ...prev.alteration_details,
-                    notes: e.target.value,
-                  },
-                }))
-              }
+              onChange={(e) => handleAlterationChange("notes", e.target.value)}
             ></textarea>
           </div>
         </div>

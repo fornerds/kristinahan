@@ -9,7 +9,7 @@ import {
   TabNavigation,
 } from "../../../modules";
 import styles from "./OrderList.module.css";
-import { useAllEvents, useOrders } from "../../../api/hooks";
+import { useCurrentEvents, useOrders } from "../../../api/hooks";
 
 export const OrderList = () => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export const OrderList = () => {
 
   const itemsPerPage = 10;
 
-  const { data: events, isLoading: eventsLoading } = useAllEvents();
+  const { data: events, isLoading: eventsLoading } = useCurrentEvents();
   const {
     data: ordersData,
     isLoading: ordersLoading,
@@ -156,6 +156,7 @@ export const OrderList = () => {
         onClose={() => setIsEventSelectionModalOpen(false)}
         onSelectEvent={handleEventSelection}
         events={events?.data || []}
+        navigate={navigate}
       />
     </div>
   );

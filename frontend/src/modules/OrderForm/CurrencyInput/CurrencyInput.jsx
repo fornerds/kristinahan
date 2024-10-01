@@ -1,49 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import styles from "./CurrencyInput.module.css"
+import React, { useState, useCallback, useMemo } from "react";
+import styles from "./CurrencyInput.module.css";
 
 const exchangeRates = {
-    원화: 1,
-    엔화: 9,  // 1엔 = 약 9원
-    달러: 1300,  // 1달러 = 약 1300원
-    '금 10K': 44820,  // 1g당 약 44,820원
-    '금 14K': 62748,
-    '금 18K': 80676,
-    '금 24K': 107568,
+  KRW: 1,
+  JPY: 1 / 9, // 1엔 = 약 9원
+  USD: 1300, // 1달러 = 약 1300원
+  GOLD_10K: 44820, // 1g당 약 44,820원
+  GOLD_14K: 62748,
+  GOLD_18K: 80676,
+  GOLD_24K: 107568,
 };
 
-export const CurrencyInput = ({ label, currencies, onChange }) => {
-    const [currency, setCurrency] = useState(currencies[0]);
-    const [amount, setAmount] = useState(0);
-  
-    useEffect(() => {
-      const converted = amount * exchangeRates[currency];
-      onChange(Math.round(converted));
-    }, [currency, amount, onChange]);
-  
+export const CurrencyInput = React.memo(
+  ({ label, currencies, onChange, initialCurrency, initialAmount }) => {
+    const [currency, setCurrency] = useState(initialCurrency || currencies[0]);
+    const [amount, setAmount] = useState(initialAmount || 0);
+
+    const handleCurrencyChange = useCallback(
+      (e) => {
+        const newCurrency = e.target.value;
+        setCurrency(newCurrency);
+        const convertedAmount = Math.round(amount * exchangeRates[newCurrency]);
+        onChange(amount, newCurrency, convertedAmount);
+      },
+      [amount, onChange]
+    );
+
+    const handleAmountChange = useCallback(
+      (e) => {
+        const newAmount = Number(e.target.value);
+        setAmount(newAmount);
+        const convertedAmount = Math.round(newAmount * exchangeRates[currency]);
+        onChange(newAmount, currency, convertedAmount);
+      },
+      [currency, onChange]
+    );
+
+    const convertedAmount = useMemo(() => {
+      return Math.round(amount * exchangeRates[currency]);
+    }, [amount, currency]);
+
+    const currencyOptions = useMemo(
+      () =>
+        currencies.map((curr) => (
+          <option key={curr} value={curr}>
+            {curr}
+          </option>
+        )),
+      [currencies]
+    );
+
     return (
       <tr>
         <td>{label}</td>
         <td>
-          <select 
-            name={label} 
+          <select
+            name={label}
             className={styles.currency}
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
+            onChange={handleCurrencyChange}
           >
-            {currencies.map((curr) => (
-              <option key={curr} value={curr}>{curr}</option>
-            ))}
+            {currencyOptions}
           </select>
         </td>
         <td>
-          <input 
-            type="number" 
-            className={styles.currencyInput} 
+          <input
+            type="number"
+            className={styles.currencyInput}
             value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
+            onChange={handleAmountChange}
           />
         </td>
-        <td>{Math.round(amount * exchangeRates[currency]).toLocaleString()} 원</td>
+        <td>{convertedAmount.toLocaleString()} 원</td>
       </tr>
     );
-  };
+  }
+);

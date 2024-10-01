@@ -5,7 +5,6 @@
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
     "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.7.7",
     "graphql": "^16.9.0",
@@ -43,11 +42,20 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/react": "^16.0.1",
     "msw": "^2.4.1"
   },
   "msw": {
     "workerDirectory": [
       "public"
     ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios|qs)/)"
+    ],
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs"
+    }
   }
 }
