@@ -9,6 +9,7 @@ import {
   useAuthors,
   useAffiliations,
   useEventDetails,
+  useCategories,
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
@@ -30,6 +31,7 @@ export const OrderForm = ({
   onComplete,
 }) => {
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
+  const { data: categoriesData } = useCategories();
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: "",
@@ -72,7 +74,7 @@ export const OrderForm = ({
   const [groupedProducts, setGroupedProducts] = useState({});
   const [payments, setPayments] = useState([
     {
-      payment_date: new Date().toISOString(),
+      payment_date: null,
       paymentMethod: "advance",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -84,9 +86,10 @@ export const OrderForm = ({
       tradeInCurrency: "GOLD_24K",
       tradeInConvertedAmount: 0,
       notes: "",
+      payerName: "",
     },
     {
-      payment_date: new Date().toISOString(),
+      payment_date: null,
       paymentMethod: "balance",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -98,6 +101,7 @@ export const OrderForm = ({
       tradeInCurrency: "GOLD_24K",
       tradeInConvertedAmount: 0,
       notes: "",
+      payerName: "",
     },
   ]);
 
@@ -201,7 +205,7 @@ export const OrderForm = ({
       ...prev,
       alteration_details: {
         ...prev.alteration_details,
-        [field]: value,
+        [field]: field === "notes" ? value : Number(value) || 0,
       },
     }));
   };
@@ -217,22 +221,8 @@ export const OrderForm = ({
     [isPayerSameAsCustomer]
   );
 
-  const handlePayerCheckboxChange = useCallback(
-    (e) => {
-      setIsPayerSameAsCustomer(e.target.checked);
-      if (e.target.checked) {
-        setPayerName(customerName);
-      }
-    },
-    [customerName]
-  );
-
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
-      // console.log(
-      //   `Change detected - Category: ${categoryId}, Field: ${field}, Value: ${value}, Type of Value: ${typeof value}`
-      // ); // 로그: 입력 변경 사항 및 타입 확인
-
       setSelectedProducts((prev) => {
         const newState = {
           ...prev,
@@ -243,13 +233,10 @@ export const OrderForm = ({
         };
 
         if (field === "productId") {
-          // productId가 문자열로 들어온 경우 숫자로 변환하여 비교
           const productId = parseInt(value, 10);
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === productId
           );
-
-          // console.log("Selected Product after change:", selectedProduct); // 로그: 변경 후 선택된 상품 확인
 
           if (selectedProduct) {
             newState[categoryId].price = selectedProduct.price;
@@ -261,6 +248,16 @@ export const OrderForm = ({
                 value: attr.value,
               })
             );
+          }
+        } else if (field === "attributes") {
+          const selectedProduct = groupedProducts[categoryId]?.find(
+            (p) => p.id === newState[categoryId].productId
+          );
+          const selectedAttribute = selectedProduct?.attributes.find(
+            (attr) => attr.value === value
+          );
+          if (selectedAttribute) {
+            newState[categoryId].attributeId = selectedAttribute.attribute_id;
           }
         }
 
@@ -311,73 +308,81 @@ export const OrderForm = ({
         const product = groupedProducts[categoryId]?.find(
           (p) => p.id === item.productId
         );
+        if (!item.productId || !item.attributeId) {
+          return null;
+        }
         return {
-          product_id: item.productId,
-          quantity: item.quantity,
-          attributes: item.attributes,
-          price: product ? product.price : 0,
+          product_id: Number(item.productId),
+          attributes_id: Number(item.attributeId),
+          quantity: Number(item.quantity) || 1,
+          price: product ? Number(product.price) : 0,
         };
       })
-      .filter((item) => item.product_id);
-
-    const advance =
-      payments.find((p) => p.paymentMethod === "advance") || payments[0];
-    const balance =
-      payments.find((p) => p.paymentMethod === "balance") || payments[1];
+      .filter(Boolean);
 
     const orderData = {
-      ...formData,
-      event_id: parseInt(event_id, 10),
-      author_id: parseInt(formData.author_id, 10),
-      modifier_id: parseInt(formData.author_id, 10),
-      affiliation_id: parseInt(formData.affiliation_id, 10),
-      totalPrice: totalPrice,
-      advancePayment: formData.advancePayment,
-      advancePaymentDate: payments[0].payment_date,
-      balancePayment: formData.balancePayment,
-      balancePaymentDate: payments[1].payment_date,
+      event_id: Number(event_id),
+      author_id: Number(formData.author_id),
+      modifier_id: Number(formData.author_id),
+      affiliation_id: Number(formData.affiliation_id),
+      status: formData.status,
+      orderName: formData.orderName || "",
+      contact: formData.contact || "",
+      address: formData.address || "",
+      collectionMethod: formData.collectionMethod || "",
+      notes: formData.notes || "",
+      totalPrice: Number(totalPrice) || 0,
+      advancePayment: Number(formData.advancePayment) || 0,
+      balancePayment: Number(formData.balancePayment) || 0,
       orderItems: orderItems,
       payments: payments.map((payment) => ({
+        payer: payment.payerName || "",
         payment_date: payment.payment_date,
-        paymentMethod: payment.paymentMethod,
-        cashAmount: payment.cashAmount,
-        cashCurrency: payment.cashCurrency,
-        cashConvertedAmount: payment.cashConvertedAmount,
-        cardAmount: payment.cardAmount,
-        cardCurrency: payment.cardCurrency,
-        cardConvertedAmount: payment.cardConvertedAmount,
-        tradeInAmount: payment.tradeInAmount,
-        tradeInCurrency: payment.tradeInCurrency,
-        tradeInConvertedAmount: payment.tradeInConvertedAmount,
-        notes: payment.notes,
+        cashAmount: Number(payment.cashAmount) || 0,
+        cashCurrency: payment.cashCurrency || "KRW",
+        cardAmount: Number(payment.cardAmount) || 0,
+        cardCurrency: payment.cardCurrency || "KRW",
+        tradeInAmount: Number(payment.tradeInAmount) || 0,
+        tradeInCurrency: payment.tradeInCurrency || "GOLD_24K",
+        paymentMethod: payment.paymentMethod || "advance",
+        notes: payment.notes || "",
       })),
+      alteration_details: {
+        jacketSleeve: Number(formData.alteration_details.jacketSleeve) || 0,
+        jacketLength: Number(formData.alteration_details.jacketLength) || 0,
+        jacketForm: Number(formData.alteration_details.jacketForm) || 0,
+        pantsCircumference:
+          Number(formData.alteration_details.pantsCircumference) || 0,
+        pantsLength: Number(formData.alteration_details.pantsLength) || 0,
+        shirtNeck: Number(formData.alteration_details.shirtNeck) || 0,
+        shirtSleeve: Number(formData.alteration_details.shirtSleeve) || 0,
+        dressBackForm: Number(formData.alteration_details.dressBackForm) || 0,
+        dressLength: Number(formData.alteration_details.dressLength) || 0,
+        notes: formData.alteration_details.notes || "",
+      },
     };
-
     console.log(orderData);
-    console.log(
-      "아직 수정중에 있습니다. 데이터 반환을 확인 작업을 위해 임시로 생성 API를 막아두겠습니다."
-    );
 
-    // try {
-    //   if (isTemp) {
-    //     await saveTempOrderMutation.mutateAsync({
-    //       orderData,
-    //       isUpdate: isEdit,
-    //     });
-    //     onSave();
-    //   } else {
-    //     await saveOrderMutation.mutateAsync({
-    //       orderData,
-    //       isUpdate: isEdit,
-    //       isTemp: false,
-    //     });
-    //     onComplete();
-    //   }
-    //   navigate(`/event/${event_id}`);
-    // } catch (error) {
-    //   console.error("Order save failed:", error);
-    //   // 에러 처리 로직
-    // }
+    try {
+      if (isTemp) {
+        await saveTempOrderMutation.mutateAsync({
+          orderData,
+          isUpdate: isEdit,
+        });
+        onSave();
+      } else {
+        await saveOrderMutation.mutateAsync({
+          orderData,
+          isUpdate: isEdit,
+          isTemp: false,
+        });
+        onComplete();
+      }
+      // navigate(`/event/${event_id}`);
+    } catch (error) {
+      console.error("Order save failed:", error);
+      // 에러 처리 로직
+    }
   };
 
   if (
@@ -529,6 +534,7 @@ export const OrderForm = ({
               value={formData.collectionMethod}
               onChange={handleCollectionMethodChange}
             >
+              <option value="">선택</option>
               <option value="Delivery">배송</option>
               <option value="Pickup on site">현장수령 (기혼 불가)</option>
               <option value="Pickup in store">매장수령</option>
@@ -639,40 +645,15 @@ export const OrderForm = ({
         <PaymentTable
           payment={payments[0]}
           onPaymentChange={handlePaymentChange(0)}
+          customerName={customerName}
+          isEdit={isEdit}
         />
         <PaymentTable
           payment={payments[1]}
           onPaymentChange={handlePaymentChange(1)}
+          customerName={customerName}
+          isEdit={isEdit}
         />
-
-        <div className={styles.sectionValueWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>결제자</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={payerName}
-                onChange={(e) => setPayerName(e.target.value)}
-                disabled={isPayerSameAsCustomer}
-              />
-              <div className={styles.sectionGroup}>
-                <input
-                  type="checkbox"
-                  name="takeCustomerName"
-                  checked={isPayerSameAsCustomer}
-                  onChange={handlePayerCheckboxChange}
-                />
-                <label
-                  htmlFor="takeCustomerName"
-                  className={styles.checkboxLabel}
-                >
-                  주문자와 동일
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <div className={styles.calculator}>
           <div className={styles.spacebetween}>

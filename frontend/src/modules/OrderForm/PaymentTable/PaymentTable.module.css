@@ -54,3 +54,13 @@
   min-height: 30px;
   margin-bottom: 20px;
 }
+
+.textInput {
+  border: 1px solid var(--cancel-color);
+  border-radius: 6px;
+  width: 200px;
+  height: 30px;
+  font-size: 14px;
+  padding: 0 4px;
+  background-color: white;
+}
