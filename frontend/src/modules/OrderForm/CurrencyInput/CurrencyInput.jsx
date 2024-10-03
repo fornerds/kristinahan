@@ -3,17 +3,30 @@ import axios from "axios";
 import styles from "./CurrencyInput.module.css";
 
 export const CurrencyInput = React.memo(
-  ({ label, currencies, onChange, initialCurrency, initialAmount }) => {
-    const [currency, setCurrency] = useState(initialCurrency || currencies[0]);
-    const [amount, setAmount] = useState(initialAmount || 0);
+  ({
+    label,
+    currencies,
+    onChange,
+    initialCurrency,
+    initialAmount,
+    allowNull,
+  }) => {
+    const [currency, setCurrency] = useState(
+      initialCurrency || (allowNull ? null : currencies[0])
+    );
+    const [amount, setAmount] = useState(
+      initialAmount !== undefined ? initialAmount : allowNull ? null : 0
+    );
     const [exchangeRates, setExchangeRates] = useState({
       KRW: 1,
       JPY: 1,
       USD: 1,
-      GOLD_10K: 1,
-      GOLD_14K: 1,
-      GOLD_18K: 1,
-      GOLD_24K: 1,
+    });
+    const [goldPrices, setGoldPrices] = useState({
+      "10K": 1,
+      "14K": 1,
+      "18K": 1,
+      "24K": 1,
     });
 
     const fetchExchangeRates = async (date) => {
@@ -43,10 +56,10 @@ export const CurrencyInput = React.memo(
         );
         const goldPrices = response.data.items[0];
         return {
-          GOLD_10K: goldPrices.gold_10k,
-          GOLD_14K: goldPrices.gold_14k,
-          GOLD_18K: goldPrices.gold_18k,
-          GOLD_24K: goldPrices.gold_24k,
+          "10K": goldPrices.gold_10k,
+          "14K": goldPrices.gold_14k,
+          "18K": goldPrices.gold_18k,
+          "24K": goldPrices.gold_24k,
         };
       } catch (error) {
         console.error("Failed to fetch gold prices:", error);
@@ -58,37 +71,51 @@ export const CurrencyInput = React.memo(
       const fetchRates = async () => {
         const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
         const rates = await fetchExchangeRates(today);
-        const goldPrices = await fetchGoldPrices(today);
-        if (rates && goldPrices) {
-          setExchangeRates({ ...rates, ...goldPrices });
-        }
+        const gold = await fetchGoldPrices(today);
+        if (rates) setExchangeRates(rates);
+        if (gold) setGoldPrices(gold);
       };
       fetchRates();
     }, []);
 
+    const calculateConvertedAmount = useCallback(
+      (newAmount, newCurrency) => {
+        if (newAmount === null || !newCurrency) return null;
+        if (["10K", "14K", "18K", "24K"].includes(newCurrency)) {
+          // 금 가격은 이미 원화로 제공되므로 단순히 곱하기만 합니다
+          return Math.round(newAmount * goldPrices[newCurrency]);
+        } else {
+          // 다른 통화의 경우 환율을 적용합니다
+          return Math.round(newAmount * exchangeRates[newCurrency]);
+        }
+      },
+      [exchangeRates, goldPrices]
+    );
+
     const handleCurrencyChange = useCallback(
       (e) => {
-        const newCurrency = e.target.value;
+        const newCurrency = e.target.value || null;
         setCurrency(newCurrency);
-        const convertedAmount = Math.round(amount * exchangeRates[newCurrency]);
+        const convertedAmount = calculateConvertedAmount(amount, newCurrency);
         onChange(amount, newCurrency, convertedAmount);
       },
-      [amount, onChange, exchangeRates]
+      [amount, onChange, calculateConvertedAmount]
     );
 
     const handleAmountChange = useCallback(
       (e) => {
-        const newAmount = Number(e.target.value);
+        const newAmount = e.target.value === "" ? null : Number(e.target.value);
         setAmount(newAmount);
-        const convertedAmount = Math.round(newAmount * exchangeRates[currency]);
+        const convertedAmount = calculateConvertedAmount(newAmount, currency);
         onChange(newAmount, currency, convertedAmount);
       },
-      [currency, onChange, exchangeRates]
+      [currency, onChange, calculateConvertedAmount]
     );
 
-    const convertedAmount = useMemo(() => {
-      return Math.round(amount * exchangeRates[currency]);
-    }, [amount, currency, exchangeRates]);
+    const convertedAmount = useMemo(
+      () => calculateConvertedAmount(amount, currency),
+      [amount, currency, calculateConvertedAmount]
+    );
 
     const currencyOptions = useMemo(
       () =>
@@ -107,9 +134,10 @@ export const CurrencyInput = React.memo(
           <select
             name={label}
             className={styles.currency}
-            value={currency}
+            value={currency || ""}
             onChange={handleCurrencyChange}
           >
+            {allowNull && <option value="">선택</option>}
             {currencyOptions}
           </select>
         </td>
@@ -117,11 +145,15 @@ export const CurrencyInput = React.memo(
           <input
             type="number"
             className={styles.currencyInput}
-            value={amount}
+            value={amount !== null ? amount : ""}
             onChange={handleAmountChange}
           />
         </td>
-        <td>{convertedAmount.toLocaleString()} 원</td>
+        <td>
+          {convertedAmount !== null && !isNaN(convertedAmount)
+            ? convertedAmount.toLocaleString() + " 원"
+            : "-"}
+        </td>
       </tr>
     );
   }

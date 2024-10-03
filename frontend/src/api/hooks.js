@@ -171,6 +171,28 @@ export const useSaveTempOrder = () => {
   );
 };
 
+export const useUpdateOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation(
+    ({ orderId, orderData, isTemp }) => api.saveOrder(orderData, true, isTemp),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries("orders");
+        queryClient.invalidateQueries(["order"]);
+      },
+    }
+  );
+};
+
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation(api.deleteOrder, {
+    onSuccess: () => {
+      queryClient.invalidateQueries("orders");
+    },
+  });
+};
+
 export const useDownloadOrders = () => {
   return useMutation(api.downloadOrders, {
     onSuccess: (data, variables) => {

@@ -112,6 +112,8 @@ export const saveTempOrder = (orderData, isUpdate = false) =>
   isUpdate
     ? api.put("/temp/order/save", orderData)
     : api.post("/temp/order/save", orderData);
+export const deleteOrder = (orderId) => api.delete(`/order/${orderId}`);
+
 export const downloadOrders = (params) =>
   api.get("/orders/download", { params, responseType: "blob" });
 

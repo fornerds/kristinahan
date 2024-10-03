@@ -16,9 +16,10 @@ const PaymentTable = ({ payment, onPaymentChange, customerName, isEdit }) => {
     (field) => (amount, currency, convertedAmount) => {
       onPaymentChange({
         ...payment,
-        [`${field}Amount`]: amount,
-        [`${field}Currency`]: currency,
-        [`${field}ConvertedAmount`]: convertedAmount,
+        [`${field}Amount`]: amount !== null ? Number(amount) : null,
+        [`${field}Currency`]: currency || null,
+        [`${field}ConvertedAmount`]:
+          convertedAmount !== null ? Number(convertedAmount) : null,
       });
     },
     [onPaymentChange, payment]
@@ -89,6 +90,7 @@ const PaymentTable = ({ payment, onPaymentChange, customerName, isEdit }) => {
                 onChange={handleCurrencyChange("cash")}
                 initialCurrency={payment.cashCurrency}
                 initialAmount={payment.cashAmount}
+                allowNull={false}
               />
               <CurrencyInput
                 label="카드"
@@ -96,13 +98,15 @@ const PaymentTable = ({ payment, onPaymentChange, customerName, isEdit }) => {
                 onChange={handleCurrencyChange("card")}
                 initialCurrency={payment.cardCurrency}
                 initialAmount={payment.cardAmount}
+                allowNull={false}
               />
               <CurrencyInput
                 label="보상판매"
-                currencies={["GOLD_10K", "GOLD_14K", "GOLD_18K", "GOLD_24K"]}
+                currencies={["10K", "14K", "18K", "24K"]}
                 onChange={handleCurrencyChange("tradeIn")}
                 initialCurrency={payment.tradeInCurrency}
                 initialAmount={payment.tradeInAmount}
+                allowNull={true}
               />
             </tbody>
           </table>

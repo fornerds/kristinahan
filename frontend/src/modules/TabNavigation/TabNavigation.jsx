@@ -59,7 +59,7 @@ export const TabNavigation = () => {
               className={styles.icon}
               fill={getIconColor(isActive)}
             />
-            카테고리(상품) 관리
+            카테고리 관리
           </>
         )}
       </NavLink>

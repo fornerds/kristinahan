@@ -13,13 +13,13 @@ import {
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
-  Order_Completed: "주문완료",
-  Packaging_Completed: "포장완료",
-  Repair_Received: "수선접수",
-  Repair_Completed: "수선완료",
-  In_delivery: "배송중",
-  Delivery_completed: "배송완료",
-  Receipt_completed: "수령완료",
+  "Order Completed": "주문완료",
+  "Packaging Completed": "포장완료",
+  "Repair Received": "수선접수",
+  "Repair Completed": "수선완료",
+  "In delivery": "배송중",
+  "Delivery completed": "배송완료",
+  "Receipt completed": "수령완료",
   Accommodation: "숙소",
 };
 
@@ -32,6 +32,12 @@ export const OrderForm = ({
 }) => {
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
   const { data: categoriesData } = useCategories();
+  const {
+    data: order,
+    isLoading: isLoadingOrderDetails,
+    error: orderDetailsError,
+  } = useOrderDetails(orderId, { enabled: isEdit });
+
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: "",
@@ -47,7 +53,38 @@ export const OrderForm = ({
     isTemporary: false,
     status: "",
     orderItems: [],
-    payments: [],
+    payments: [
+      {
+        payment_date: null,
+        paymentMethod: "advance",
+        cashAmount: 0,
+        cashCurrency: "KRW",
+        cashConvertedAmount: 0,
+        cardAmount: 0,
+        cardCurrency: "KRW",
+        cardConvertedAmount: 0,
+        tradeInAmount: 0,
+        tradeInCurrency: null,
+        tradeInConvertedAmount: 0,
+        notes: "",
+        payerName: "",
+      },
+      {
+        payment_date: null,
+        paymentMethod: "balance",
+        cashAmount: 0,
+        cashCurrency: "KRW",
+        cashConvertedAmount: 0,
+        cardAmount: 0,
+        cardCurrency: "KRW",
+        cardConvertedAmount: 0,
+        tradeInAmount: 0,
+        tradeInCurrency: null,
+        tradeInConvertedAmount: 0,
+        notes: "",
+        payerName: "",
+      },
+    ],
     alteration_details: {
       jacketSleeve: 0,
       jacketLength: 0,
@@ -63,6 +100,7 @@ export const OrderForm = ({
   });
 
   const eventData = event?.data;
+  const orderDetails = order?.data;
 
   const [customerName, setCustomerName] = useState("");
   const [payerName, setPayerName] = useState("");
@@ -72,64 +110,74 @@ export const OrderForm = ({
   const [totalPrice, setTotalPrice] = useState(0);
   const [selectedProducts, setSelectedProducts] = useState({});
   const [groupedProducts, setGroupedProducts] = useState({});
-  const [payments, setPayments] = useState([
-    {
-      payment_date: null,
-      paymentMethod: "advance",
-      cashAmount: 0,
-      cashCurrency: "KRW",
-      cashConvertedAmount: 0,
-      cardAmount: 0,
-      cardCurrency: "KRW",
-      cardConvertedAmount: 0,
-      tradeInAmount: 0,
-      tradeInCurrency: "GOLD_24K",
-      tradeInConvertedAmount: 0,
-      notes: "",
-      payerName: "",
-    },
-    {
-      payment_date: null,
-      paymentMethod: "balance",
-      cashAmount: 0,
-      cashCurrency: "KRW",
-      cashConvertedAmount: 0,
-      cardAmount: 0,
-      cardCurrency: "KRW",
-      cardConvertedAmount: 0,
-      tradeInAmount: 0,
-      tradeInCurrency: "GOLD_24K",
-      tradeInConvertedAmount: 0,
-      notes: "",
-      payerName: "",
-    },
-  ]);
 
   const saveOrderMutation = useSaveOrder();
   const saveTempOrderMutation = useSaveTempOrder();
-  const {
-    data: orderDetails,
-    isLoading: isLoadingOrderDetails,
-    error: orderDetailsError,
-  } = useOrderDetails(orderId, { enabled: isEdit });
-
   const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
   const { data: affiliations, isLoading: isLoadingAffiliations } =
     useAffiliations();
 
   useEffect(() => {
     if (isEdit && orderDetails) {
-      setFormData(orderDetails);
-      setCustomerName(orderDetails.orderName);
-      setPayerName(orderDetails.payments[0]?.payerName || "");
+      setFormData((prevFormData) => ({
+        ...prevFormData,
+        ...orderDetails,
+        event_id: event_id,
+        payments:
+          orderDetails.payments && orderDetails.payments.length
+            ? orderDetails.payments
+            : prevFormData.payments,
+        alteration_details:
+          orderDetails.alteration_details &&
+          orderDetails.alteration_details.length > 0
+            ? {
+                jacketSleeve:
+                  orderDetails.alteration_details[0].jacketSleeve || 0,
+                jacketLength:
+                  orderDetails.alteration_details[0].jacketLength || 0,
+                jacketForm: orderDetails.alteration_details[0].jacketForm || 0,
+                pantsCircumference:
+                  orderDetails.alteration_details[0].pantsCircumference || 0,
+                pantsLength:
+                  orderDetails.alteration_details[0].pantsLength || 0,
+                shirtNeck: orderDetails.alteration_details[0].shirtNeck || 0,
+                shirtSleeve:
+                  orderDetails.alteration_details[0].shirtSleeve || 0,
+                dressBackForm:
+                  orderDetails.alteration_details[0].dressBackForm || 0,
+                dressLength:
+                  orderDetails.alteration_details[0].dressLength || 0,
+                notes: orderDetails.alteration_details[0].notes || "",
+              }
+            : prevFormData.alteration_details,
+      }));
+
+      setCustomerName(orderDetails.orderName || "");
+      setPayerName(orderDetails.payments?.[0]?.payer || "");
       setIsPayerSameAsCustomer(
-        orderDetails.orderName === orderDetails.payments[0]?.payerName
+        orderDetails.orderName === orderDetails.payments?.[0]?.payer
       );
-      setPrepaymentTotal(orderDetails.advancePayment);
-      setBalanceTotal(orderDetails.balancePayment);
-      setTotalPrice(orderDetails.totalPrice);
+      setPrepaymentTotal(orderDetails.advancePayment || 0);
+      setBalanceTotal(orderDetails.balancePayment || 0);
+      setTotalPrice(orderDetails.totalPrice || 0);
+
+      // 상품 정보 초기화
+      if (orderDetails.orderItems) {
+        const initialSelectedProducts = {};
+        orderDetails.orderItems.forEach((item, i) => {
+          initialSelectedProducts[i] = {
+            productId: item.product.product_id,
+            productName: item.product.name,
+            attributeId: item.attributes[0]?.attributes_id,
+            attributes: item.attributes[0]?.value,
+            quantity: item.quantity,
+            price: item.price,
+          };
+        });
+        setSelectedProducts(initialSelectedProducts);
+      }
     }
-  }, [isEdit, orderDetails]);
+  }, [isEdit, orderDetails, event_id]);
 
   useEffect(() => {
     if (eventData && !isEdit) {
@@ -138,7 +186,6 @@ export const OrderForm = ({
         return acc;
       }, {});
       setGroupedProducts(grouped);
-      console.log("Grouped Products initialized:", grouped); // 로그: 초기화된 groupedProducts 확인
     }
   }, [eventData, isEdit]);
 
@@ -185,8 +232,8 @@ export const OrderForm = ({
 
   const handlePaymentChange = useCallback(
     (index) => (updatedPayment) => {
-      setPayments((prev) => {
-        const newPayments = [...prev];
+      setFormData((prev) => {
+        const newPayments = [...prev.payments];
         newPayments[index] = {
           ...updatedPayment,
           cashConvertedAmount: Number(updatedPayment.cashConvertedAmount) || 0,
@@ -194,7 +241,7 @@ export const OrderForm = ({
           tradeInConvertedAmount:
             Number(updatedPayment.tradeInConvertedAmount) || 0,
         };
-        return newPayments;
+        return { ...prev, payments: newPayments };
       });
     },
     []
@@ -239,15 +286,18 @@ export const OrderForm = ({
           );
 
           if (selectedProduct) {
-            newState[categoryId].price = selectedProduct.price;
-            newState[categoryId].quantity = 1;
-            newState[categoryId].attributes = "";
-            newState[categoryId].sizes = selectedProduct.attributes.map(
-              (attr) => ({
+            newState[categoryId] = {
+              ...newState[categoryId],
+              productId: productId,
+              price: selectedProduct.price,
+              quantity: 1,
+              attributes: "",
+              attributeId: null,
+              sizes: selectedProduct.attributes.map((attr) => ({
                 id: attr.attribute_id,
                 value: attr.value,
-              })
-            );
+              })),
+            };
           }
         } else if (field === "attributes") {
           const selectedProduct = groupedProducts[categoryId]?.find(
@@ -258,6 +308,7 @@ export const OrderForm = ({
           );
           if (selectedAttribute) {
             newState[categoryId].attributeId = selectedAttribute.attribute_id;
+            newState[categoryId].attributes = value;
           }
         }
 
@@ -276,9 +327,11 @@ export const OrderForm = ({
     };
 
     const advance =
-      payments.find((p) => p.paymentMethod === "advance") || payments[0];
+      formData.payments.find((p) => p.paymentMethod === "advance") ||
+      formData.payments[0];
     const balance =
-      payments.find((p) => p.paymentMethod === "balance") || payments[1];
+      formData.payments.find((p) => p.paymentMethod === "balance") ||
+      formData.payments[1];
 
     const advanceTotal = calculateTotal(advance);
     const balanceTotal = calculateTotal(balance);
@@ -291,7 +344,7 @@ export const OrderForm = ({
 
     setPrepaymentTotal(advanceTotal);
     setBalanceTotal(balanceTotal);
-  }, [payments]);
+  }, [formData.payments]);
 
   useEffect(() => {
     const newTotalPrice = Object.values(selectedProducts).reduce(
@@ -303,22 +356,14 @@ export const OrderForm = ({
   }, [selectedProducts]);
 
   const handleSubmit = async (isTemp = false) => {
-    const orderItems = Object.entries(selectedProducts)
-      .map(([categoryId, item]) => {
-        const product = groupedProducts[categoryId]?.find(
-          (p) => p.id === item.productId
-        );
-        if (!item.productId || !item.attributeId) {
-          return null;
-        }
-        return {
-          product_id: Number(item.productId),
-          attributes_id: Number(item.attributeId),
-          quantity: Number(item.quantity) || 1,
-          price: product ? Number(product.price) : 0,
-        };
-      })
-      .filter(Boolean);
+    const orderItems = Object.values(selectedProducts)
+      .filter((item) => item.productId && item.attributeId)
+      .map((item) => ({
+        product_id: Number(item.productId),
+        attributes_id: Number(item.attributeId),
+        quantity: Number(item.quantity) || 1,
+        price: Number(item.price) || 0,
+      }));
 
     const orderData = {
       event_id: Number(event_id),
@@ -335,16 +380,18 @@ export const OrderForm = ({
       advancePayment: Number(formData.advancePayment) || 0,
       balancePayment: Number(formData.balancePayment) || 0,
       orderItems: orderItems,
-      payments: payments.map((payment) => ({
+      payments: formData.payments.map((payment) => ({
         payer: payment.payerName || "",
         payment_date: payment.payment_date,
         cashAmount: Number(payment.cashAmount) || 0,
         cashCurrency: payment.cashCurrency || "KRW",
         cardAmount: Number(payment.cardAmount) || 0,
         cardCurrency: payment.cardCurrency || "KRW",
-        tradeInAmount: Number(payment.tradeInAmount) || 0,
-        tradeInCurrency: payment.tradeInCurrency || "GOLD_24K",
-        paymentMethod: payment.paymentMethod || "advance",
+        tradeInAmount: payment.tradeInAmount
+          ? Number(payment.tradeInAmount)
+          : null,
+        tradeInCurrency: payment.tradeInCurrency || null,
+        paymentMethod: payment.paymentMethod,
         notes: payment.notes || "",
       })),
       alteration_details: {
@@ -361,7 +408,6 @@ export const OrderForm = ({
         notes: formData.alteration_details.notes || "",
       },
     };
-    console.log(orderData);
 
     try {
       if (isTemp) {
@@ -378,7 +424,6 @@ export const OrderForm = ({
         });
         onComplete();
       }
-      // navigate(`/event/${event_id}`);
     } catch (error) {
       console.error("Order save failed:", error);
       // 에러 처리 로직
@@ -437,7 +482,11 @@ export const OrderForm = ({
             <>
               <div className={styles.sectionGroup}>
                 <h4 className={styles.sectionLabel}>작성자</h4>
-                <p className={styles.sectionValue}>{orderDetails.author_id}</p>
+                <p className={styles.sectionValue}>
+                  {authors?.data?.find(
+                    (author) => author.id === orderDetails.author_id
+                  )?.name || orderDetails.author_id}
+                </p>
               </div>
               <div className={styles.sectionGroup}>
                 <h4 className={styles.sectionLabel}>작성일자</h4>
@@ -643,13 +692,13 @@ export const OrderForm = ({
         <h3 className={styles.sectionTitle}>결제정보</h3>
 
         <PaymentTable
-          payment={payments[0]}
+          payment={formData.payments[0]}
           onPaymentChange={handlePaymentChange(0)}
           customerName={customerName}
           isEdit={isEdit}
         />
         <PaymentTable
-          payment={payments[1]}
+          payment={formData.payments[1]}
           onPaymentChange={handlePaymentChange(1)}
           customerName={customerName}
           isEdit={isEdit}
@@ -842,24 +891,25 @@ export const OrderForm = ({
           </div>
         </div>
       </section>
-
-      <div className={styles.actionButtonsWrap}>
-        <Button
-          type="button"
-          onClick={() => handleSubmit(true)}
-          className={styles.tempSaveButton}
-          variant="primary"
-        >
-          임시 저장
-        </Button>
-        <Button
-          type="submit"
-          className={styles.submitButton}
-          onClick={() => handleSubmit(false)}
-        >
-          {isEdit ? "수정 완료" : "작성 완료"}
-        </Button>
-      </div>
+      {!isEdit && (
+        <div className={styles.actionButtonsWrap}>
+          <Button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            className={styles.tempSaveButton}
+            variant="primary"
+          >
+            임시 저장
+          </Button>
+          <Button
+            type="submit"
+            className={styles.submitButton}
+            onClick={() => handleSubmit(false)}
+          >
+            {isEdit ? "수정 완료" : "작성 완료"}
+          </Button>
+        </div>
+      )}
     </>
   );
 };

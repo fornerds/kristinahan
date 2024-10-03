@@ -1,10 +1,16 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import styles from "./OrderList.module.css";
 import { Filter, Pagination, Tab } from "../../../modules";
 import { Button } from "../../../components";
 import { ReactComponent as LeftArrow } from "../../../asset/icon/left_small.svg";
-import { useEventDetails, useOrders } from "../../../api/hooks";
+import {
+  useEventDetails,
+  useOrders,
+  useAuthors,
+  useAffiliations,
+  useUpdateOrderStatus,
+} from "../../../api/hooks";
 
 export const OrderList = () => {
   const { event_id } = useParams();
@@ -29,11 +35,11 @@ export const OrderList = () => {
     isLoading: eventLoading,
     error: eventError,
   } = useEventDetails(event_id);
-
   const {
     data: ordersData,
     isLoading: ordersLoading,
     error: ordersError,
+    refetch,
   } = useOrders({
     ...filters,
     event_id,
@@ -42,6 +48,38 @@ export const OrderList = () => {
     order_date_from: filters.order_date_from || undefined,
     order_date_to: filters.order_date_to || undefined,
   });
+  const { data: authorsData, isLoading: authorsLoading } = useAuthors();
+  const { data: affiliationsData, isLoading: affiliationsLoading } =
+    useAffiliations();
+  const updateOrderStatusMutation = useUpdateOrderStatus();
+
+  const authors = useMemo(
+    () =>
+      authorsData?.data.reduce(
+        (acc, author) => ({ ...acc, [author.id]: author.name }),
+        {}
+      ) || {},
+    [authorsData]
+  );
+
+  const affiliations = useMemo(
+    () =>
+      affiliationsData?.data.reduce(
+        (acc, affiliation) => ({ ...acc, [affiliation.id]: affiliation.name }),
+        {}
+      ) || {},
+    [affiliationsData]
+  );
+
+  useEffect(() => {
+    if (event_id) {
+      refetch();
+    }
+  }, [event_id, filters, currentPage, refetch]);
+
+  const orders = ordersData?.data?.orders || [];
+  const total = ordersData?.data?.total || 0;
+  const eventData = eventResponse?.data;
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -54,11 +92,25 @@ export const OrderList = () => {
     }));
   }, []);
 
-  const handleOrderStatusChange = useCallback((event, id) => {
-    event.stopPropagation();
-    // API call to update order status
-    console.log(`Update order ${id} status to ${event.target.value}`);
-  }, []);
+  const handleOrderStatusChange = useCallback(
+    (event, orderId) => {
+      event.stopPropagation();
+      const newStatus = event.target.value;
+      updateOrderStatusMutation.mutate(
+        { orderId, status: newStatus },
+        {
+          onSuccess: () => {
+            console.log(`Order ${orderId} status updated to ${newStatus}`);
+          },
+          onError: (error) => {
+            console.error("Failed to update order status:", error);
+            alert("주문 상태 업데이트에 실패했습니다. 다시 시도해주세요.");
+          },
+        }
+      );
+    },
+    [updateOrderStatusMutation]
+  );
 
   const handleRowClick = (event, order) => {
     if (event.target.tagName.toLowerCase() !== "select") {
@@ -77,6 +129,20 @@ export const OrderList = () => {
       is_temp: tabName === "tab2",
     });
     setCurrentPage(1);
+    refetch();
+  };
+
+  const getCollectionMethod = (method) => {
+    switch (method) {
+      case "Delivery":
+        return "배송";
+      case "Pickup on site":
+        return "현장수령";
+      case "Pickup in store":
+        return "매장수령";
+      default:
+        return method;
+    }
   };
 
   const renderTable = (items) => (
@@ -94,7 +160,8 @@ export const OrderList = () => {
             style={{ cursor: "pointer" }}
           >
             주문일자{" "}
-            {filters.sort.includes("order_date") &&
+            {filters.sort &&
+              filters.sort.includes("order_date") &&
               (filters.sort === "order_date_asc" ? "▲" : "▼")}
           </th>
           <th scope="col">총주문금액</th>
@@ -104,10 +171,10 @@ export const OrderList = () => {
         </tr>
       </thead>
       <tbody>
-        {ordersLoading ? (
+        {ordersLoading || authorsLoading || affiliationsLoading ? (
           <tr>
             <td colSpan="10" className={styles.loadingMessageWrap}>
-              주문서 데이터를 불러오는 중입니다...
+              데이터를 불러오는 중입니다...
             </td>
           </tr>
         ) : ordersError ? (
@@ -130,10 +197,12 @@ export const OrderList = () => {
               onClick={(event) => handleRowClick(event, order)}
               className={styles.orderLink}
             >
-              <td>{order.author_id}</td>
+              <td>{authors[order.author_id] || order.author_id}</td>
               <td>{order.orderName}</td>
-              <td>{order.affiliation_id}</td>
-              <td>{order.collectionMethod}</td>
+              <td>
+                {affiliations[order.affiliation_id] || order.affiliation_id}
+              </td>
+              <td>{getCollectionMethod(order.collectionMethod)}</td>
               <td>
                 <select
                   name={`order_${order.id}`}
@@ -141,14 +210,15 @@ export const OrderList = () => {
                   className={styles.orderStatus}
                   value={order.status}
                   onChange={(event) => handleOrderStatusChange(event, order.id)}
+                  onClick={(e) => e.stopPropagation()} // 이벤트 버블링 방지
                 >
-                  <option value="Order_Completed">주문완료</option>
-                  <option value="Packaging_Completed">포장완료</option>
-                  <option value="Repair_Received">수선접수</option>
-                  <option value="Repair_Completed">수선완료</option>
-                  <option value="In_delivery">배송중</option>
-                  <option value="Delivery_completed">배송완료</option>
-                  <option value="Receipt_completed">수령완료</option>
+                  <option value="Order Completed">주문완료</option>
+                  <option value="Packaging Completed">포장완료</option>
+                  <option value="Repair Received">수선접수</option>
+                  <option value="Repair Completed">수선완료</option>
+                  <option value="In delivery">배송중</option>
+                  <option value="Delivery completed">배송완료</option>
+                  <option value="Receipt completed">수령완료</option>
                   <option value="Accommodation">숙소</option>
                 </select>
               </td>
@@ -164,16 +234,11 @@ export const OrderList = () => {
     </table>
   );
 
-  const eventData = eventResponse?.data;
-  const orders = ordersData?.data?.orders || [];
-
   return (
     <div className={styles.orderListTableBackground}>
       <section className={styles.tableWrap}>
         <div className={styles.tableTitleWrap}>
-          <Link
-            to={location.pathname.includes("admin") ? "/admin/event" : "/event"}
-          >
+          <Link to="/event">
             <LeftArrow />
           </Link>
           <h2 className={styles.tableTitle}>
@@ -181,7 +246,7 @@ export const OrderList = () => {
               ? "Loading..."
               : eventError
               ? "이벤트 정보를 불러오는데 실패했습니다."
-              : `[${eventData?.event_name}] 주문서 목록`}
+              : `[${eventData?.name}] 주문서 목록`}
           </h2>
         </div>
         <Tab defaultActiveTab="tab1" onTabChange={handleTabChange}>
@@ -204,7 +269,7 @@ export const OrderList = () => {
             <Pagination
               className={styles.pagination}
               currentPage={currentPage}
-              totalItems={ordersData?.data?.total || 0}
+              totalItems={total}
               itemsPerPage={itemsPerPage}
               onPageChange={handlePageChange}
             />
@@ -224,7 +289,7 @@ export const OrderList = () => {
             <Pagination
               className={styles.pagination}
               currentPage={currentPage}
-              totalItems={ordersData?.data?.total || 0}
+              totalItems={total}
               itemsPerPage={itemsPerPage}
               onPageChange={handlePageChange}
             />
