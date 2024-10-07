@@ -10,6 +10,7 @@ import {
   useAuthors,
   useAffiliations,
   useUpdateOrderStatus,
+  useDownloadOrders,
 } from "../../../api/hooks";
 
 export const OrderList = () => {
@@ -61,6 +62,18 @@ export const OrderList = () => {
       ) || {},
     [authorsData]
   );
+
+  const downloadOrdersMutation = useDownloadOrders();
+
+  const handleExcelDownload = useCallback(() => {
+    const downloadParams = {
+      ...filters,
+      event_id: event_id,
+      limit: total, // 모든 주문서를 다운로드하기 위해 총 개수를 limit으로 설정
+      offset: 0,
+    };
+    downloadOrdersMutation.mutate(downloadParams);
+  }, [downloadOrdersMutation, filters, event_id, total]);
 
   const affiliations = useMemo(
     () =>
@@ -253,7 +266,11 @@ export const OrderList = () => {
           <Tab.TabPane name="tab1" tab="주문서 목록">
             <Filter filters={filters} setFilters={setFilters} />
             <div className={styles.actionButtonsWrap}>
-              <Button label="Excel 저장" className={styles.excelButton} />
+              <Button
+                label="Excel 저장"
+                className={styles.excelButton}
+                onClick={handleExcelDownload}
+              />
               <Link
                 to={
                   location.pathname.includes("admin")
@@ -277,7 +294,11 @@ export const OrderList = () => {
           <Tab.TabPane name="tab2" tab="임시저장 목록">
             <Filter filters={filters} setFilters={setFilters} />
             <div className={styles.actionButtonsWrap}>
-              <Button label="Excel 저장" className={styles.excelButton} />
+              <Button
+                label="Excel 저장"
+                className={styles.excelButton}
+                onClick={handleExcelDownload}
+              />
               <Link
                 to={`/event/${event_id}/create`}
                 className={styles.newOrderLink}

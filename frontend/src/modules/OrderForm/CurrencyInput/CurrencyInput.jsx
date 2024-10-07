@@ -82,11 +82,11 @@ export const CurrencyInput = React.memo(
       (newAmount, newCurrency) => {
         if (newAmount === null || !newCurrency) return null;
         if (["10K", "14K", "18K", "24K"].includes(newCurrency)) {
-          // 금 가격은 이미 원화로 제공되므로 단순히 곱하기만 합니다
-          return Math.round(newAmount * goldPrices[newCurrency]);
+          return Math.round(Math.max(0, newAmount) * goldPrices[newCurrency]);
         } else {
-          // 다른 통화의 경우 환율을 적용합니다
-          return Math.round(newAmount * exchangeRates[newCurrency]);
+          return Math.round(
+            Math.max(0, newAmount) * exchangeRates[newCurrency]
+          );
         }
       },
       [exchangeRates, goldPrices]
@@ -104,7 +104,8 @@ export const CurrencyInput = React.memo(
 
     const handleAmountChange = useCallback(
       (e) => {
-        const newAmount = e.target.value === "" ? null : Number(e.target.value);
+        const newAmount =
+          e.target.value === "" ? null : Math.max(0, Number(e.target.value));
         setAmount(newAmount);
         const convertedAmount = calculateConvertedAmount(newAmount, currency);
         onChange(newAmount, currency, convertedAmount);
@@ -144,6 +145,7 @@ export const CurrencyInput = React.memo(
         <td>
           <input
             type="number"
+            min="0"
             className={styles.currencyInput}
             value={amount !== null ? amount : ""}
             onChange={handleAmountChange}

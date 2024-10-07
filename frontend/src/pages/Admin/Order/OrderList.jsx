@@ -14,6 +14,7 @@ import {
   useOrders,
   useAuthors,
   useAffiliations,
+  useDownloadOrders,
 } from "../../../api/hooks";
 import { updateOrderStatus } from "../../../api/api"; // 새로운 API 함수 import
 
@@ -91,6 +92,17 @@ export const OrderList = () => {
       sort: prev.sort === `${key}_asc` ? `${key}_desc` : `${key}_asc`,
     }));
   };
+
+  const downloadOrdersMutation = useDownloadOrders();
+
+  const handleExcelDownload = useCallback(() => {
+    const downloadParams = {
+      ...filters,
+      limit: total, // 모든 주문서를 다운로드하기 위해 총 개수를 limit으로 설정
+      offset: 0,
+    };
+    downloadOrdersMutation.mutate(downloadParams);
+  }, [downloadOrdersMutation, filters, total]);
 
   const handleTabChange = (tabName) => {
     setFilters({
@@ -243,7 +255,11 @@ export const OrderList = () => {
                 isAdminPage={true}
               />
               <div className={styles.actionButtonsWrap}>
-                <Button label="Excel 저장" className={styles.excelButton} />
+                <Button
+                  label="Excel 저장"
+                  className={styles.excelButton}
+                  onClick={handleExcelDownload}
+                />
                 <Button
                   label="주문서 작성"
                   className={styles.newOrderButton}
@@ -262,7 +278,11 @@ export const OrderList = () => {
             <Tab.TabPane name="tab2" tab="임시저장 목록">
               <Filter filters={filters} setFilters={setFilters} />
               <div className={styles.actionButtonsWrap}>
-                <Button label="Excel 저장" className={styles.excelButton} />
+                <Button
+                  label="Excel 저장"
+                  className={styles.excelButton}
+                  onClick={handleExcelDownload}
+                />
                 <Button
                   label="주문서 작성"
                   className={styles.newOrderButton}

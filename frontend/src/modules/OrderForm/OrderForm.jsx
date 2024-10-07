@@ -12,6 +12,7 @@ import {
   useAffiliations,
   useEventDetails,
   useFormDetails,
+  useCategories,
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
@@ -122,21 +123,12 @@ export const OrderForm = ({
 
   const formDetails = formDetailData?.data;
 
-  const categoryQueries = useQueries(
-    formDetails?.categories.map((category) => ({
-      queryKey: ["category", category.id],
-      queryFn: () => api.getCategoryDetails(category.id),
-      enabled: !!formDetails,
-    })) || []
-  );
-
-  // console.log(categoryQueries);
-
-  const isLoadingCategories = categoryQueries.some((query) => query.isLoading);
-  const categoriesError = categoryQueries.find((query) => query.isError);
-  const categoriesData = categoryQueries
-    .filter((query) => query.isSuccess)
-    .map((query) => query.data.data);
+  const {
+    data: categories,
+    isLoading: isLoadingCategories,
+    error: categoriesError,
+  } = useCategories();
+  const categoriesData = categories?.data;
 
   const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
   const { data: affiliations, isLoading: isLoadingAffiliations } =
@@ -187,20 +179,18 @@ export const OrderForm = ({
   }, [isEdit, orderDetails]);
 
   useEffect(() => {
-    if (eventData && categoriesData && !isEdit) {
-      const eventCategories = eventData.categories
-        .map((categoryId) =>
-          categoriesData.find((category) => category.id === categoryId)
-        )
-        .filter(Boolean);
-
-      const grouped = eventCategories.reduce((acc, category) => {
-        acc[category.id] = category.products || [];
-        return acc;
-      }, {});
-      setGroupedProducts(grouped);
+    if (event?.data && categories && !isEdit) {
+      const newGroupedProducts = {};
+      event.data.form.categories.forEach((eventCategory) => {
+        const category = categories.data.find((c) => c.id === eventCategory.id);
+        if (category) {
+          newGroupedProducts[category.id] = category.products;
+        }
+      });
+      setGroupedProducts(newGroupedProducts);
+      // console.log("Grouped Products:", newGroupedProducts); // 추가된 로그
     }
-  }, [eventData, categoriesData, isEdit]);
+  }, [event, categories, isEdit]);
 
   useEffect(() => {
     if (isPayerSameAsCustomer) {
@@ -938,24 +928,6 @@ export const OrderForm = ({
           </div>
         </div>
       </section>
-
-      <div className={styles.actionButtonsWrap}>
-        <Button
-          type="button"
-          onClick={() => handleSubmit(true)}
-          className={styles.tempSaveButton}
-          variant="primary"
-        >
-          임시 저장
-        </Button>
-        <Button
-          type="submit"
-          className={styles.submitButton}
-          onClick={() => handleSubmit(false)}
-        >
-          {isEdit ? "수정 완료" : "작성 완료"}
-        </Button>
-      </div>
     </>
   );
 };

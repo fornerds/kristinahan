@@ -188,16 +188,18 @@ export const OrderCreateForm = ({
 
       const calculateTotal = (payment) => {
         return (
-          (payment.cashConvertedAmount || 0) +
-          (payment.cardConvertedAmount || 0) +
-          (payment.tradeInConvertedAmount || 0)
+          Number(payment.cashConvertedAmount || 0) +
+          Number(payment.cardConvertedAmount || 0) +
+          Number(payment.tradeInConvertedAmount || 0)
         );
       };
 
+      const total = calculateTotal(updatedPayment);
+
       if (updatedPayment.paymentMethod === "advance") {
-        setPrepaymentTotal(calculateTotal(updatedPayment));
+        setPrepaymentTotal(total);
       } else if (updatedPayment.paymentMethod === "balance") {
-        setBalanceTotal(calculateTotal(updatedPayment));
+        setBalanceTotal(total);
       }
     },
     []
@@ -334,38 +336,20 @@ export const OrderCreateForm = ({
       return currencyMap[currency] || currency;
     };
 
-    const calculatePaymentTotal = (payment) => {
-      return (
-        (payment.cashConvertedAmount || 0) +
-        (payment.cardConvertedAmount || 0) +
-        (payment.tradeInConvertedAmount || 0)
-      );
-    };
-
     const paymentsData = payments.map((payment) => ({
       payer: payment.payerName || customerName,
       payment_date: payment.payment_date,
-      cashAmount: payment.cashAmount || 0,
+      cashAmount: Number(payment.cashAmount) || 0,
       cashCurrency: payment.cashCurrency,
-      cardAmount: payment.cardAmount || 0,
+      cardAmount: Number(payment.cardAmoun) || 0,
       cardCurrency: payment.cardCurrency,
-      tradeInAmount: payment.tradeInAmount || null,
+      tradeInAmount: Number(payment.tradeInAmount) || null,
       tradeInCurrency: payment.tradeInAmount
         ? convertTradeInCurrency(payment.tradeInCurrency)
         : null,
       paymentMethod: payment.paymentMethod.toUpperCase(),
       notes: payment.notes,
     }));
-
-    const advancePayment = paymentsData.find(
-      (p) => p.paymentMethod === "ADVANCE"
-    );
-    const balancePayment = paymentsData.find(
-      (p) => p.paymentMethod === "BALANCE"
-    );
-
-    const advancePaymentTotal = calculatePaymentTotal(advancePayment);
-    const balancePaymentTotal = calculatePaymentTotal(balancePayment);
 
     const orderData = {
       ...formData,
@@ -374,8 +358,8 @@ export const OrderCreateForm = ({
       modifier_id: parseInt(formData.author_id, 10),
       affiliation_id: parseInt(formData.affiliation_id, 10),
       totalPrice: totalItemsPrice,
-      advancePayment: advancePaymentTotal,
-      balancePayment: balancePaymentTotal,
+      advancePayment: prepaymentTotal,
+      balancePayment: balanceTotal,
       orderItems: orderItems,
       payments: paymentsData,
       alteration_details: {
@@ -670,12 +654,12 @@ export const OrderCreateForm = ({
                   <Input
                     type="number"
                     min="0"
-                    value={selectedProducts[category.id]?.quantity || 1}
+                    value={selectedProducts[category.id]?.quantity || 0}
                     onChange={(e) =>
                       handleProductChange(
                         category.id,
                         "quantity",
-                        parseInt(e.target.value, 10)
+                        Math.max(0, parseInt(e.target.value, 10) || 0)
                       )
                     }
                     disabled={!selectedProducts[category.id]?.productId}
