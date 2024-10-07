@@ -1,1 +1,1 @@
-export { PaymentTable } from "./PaymentTable"
+export { default as PaymentTable } from "./PaymentTable";

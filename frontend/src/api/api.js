@@ -104,10 +104,14 @@ export const getOrders = (params) => {
 export const getOrderDetails = (orderId) => api.get(`/order/${orderId}`);
 export const updateOrderStatus = (orderId, status) =>
   api.put(`/orders/${orderId}/${status}`);
-export const saveOrder = (orderData, isUpdate = false, isTemp = false) =>
-  isUpdate
-    ? api.put("/order/save", orderData, { params: { is_temp: isTemp } })
-    : api.post("/order/save", orderData, { params: { is_temp: isTemp } });
+export const saveOrder = (orderData, orderId = null, isTemp = false) => {
+  const endpoint = orderId ? `/order/save/${orderId}` : "/order/save";
+  const method = orderId ? "put" : "post";
+
+  return api[method](endpoint, orderData, {
+    params: { is_temp: isTemp },
+  });
+};
 export const saveTempOrder = (orderData, isUpdate = false) =>
   isUpdate
     ? api.put("/temp/order/save", orderData)

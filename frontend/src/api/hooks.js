@@ -155,8 +155,8 @@ export const useUpdateOrderStatus = () => {
 export const useSaveOrder = () => {
   const queryClient = useQueryClient();
   return useMutation(
-    ({ orderData, isUpdate, isTemp }) =>
-      api.saveOrder(orderData, isUpdate, isTemp),
+    ({ orderData, orderId, isTemp }) =>
+      api.saveOrder(orderData, orderId, isTemp),
     {
       onSuccess: () => {
         queryClient.invalidateQueries("orders");
@@ -166,8 +166,8 @@ export const useSaveOrder = () => {
 };
 
 export const useSaveTempOrder = () => {
-  return useMutation(({ orderData, isUpdate }) =>
-    api.saveTempOrder(orderData, isUpdate)
+  return useMutation(({ orderData, orderId }) =>
+    api.saveOrder(orderData, orderId, true)
   );
 };
 
@@ -334,7 +334,7 @@ export const useCreateForm = () => {
 };
 
 export const useFormDetails = (formId) => {
-  return useQuery(["form", formId], () => api.getFormDetails(formId), {
+  return useQuery(["formDetails", formId], () => api.getFormDetails(formId), {
     enabled: !!formId,
   });
 };
