@@ -63,18 +63,6 @@ export const OrderList = () => {
     [authorsData]
   );
 
-  const downloadOrdersMutation = useDownloadOrders();
-
-  const handleExcelDownload = useCallback(() => {
-    const downloadParams = {
-      ...filters,
-      event_id: event_id,
-      limit: total, // 모든 주문서를 다운로드하기 위해 총 개수를 limit으로 설정
-      offset: 0,
-    };
-    downloadOrdersMutation.mutate(downloadParams);
-  }, [downloadOrdersMutation, filters, event_id, total]);
-
   const affiliations = useMemo(
     () =>
       affiliationsData?.data.reduce(
@@ -93,6 +81,18 @@ export const OrderList = () => {
   const orders = ordersData?.data?.orders || [];
   const total = ordersData?.data?.total || 0;
   const eventData = eventResponse?.data;
+
+  const downloadOrdersMutation = useDownloadOrders();
+
+  const handleExcelDownload = useCallback(() => {
+    const downloadParams = {
+      ...filters,
+      event_id: event_id,
+      limit: total,
+      offset: 0,
+    };
+    downloadOrdersMutation.mutate(downloadParams);
+  }, [downloadOrdersMutation, filters, event_id, total]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
