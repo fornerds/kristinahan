@@ -88,11 +88,11 @@ export const OrderList = () => {
     const downloadParams = {
       ...filters,
       event_id: event_id,
-      limit: total,
+      limit: ordersData?.data?.total || 0,
       offset: 0,
     };
     downloadOrdersMutation.mutate(downloadParams);
-  }, [downloadOrdersMutation, filters, event_id, total]);
+  }, [downloadOrdersMutation, filters, event_id, ordersData?.data?.total]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
