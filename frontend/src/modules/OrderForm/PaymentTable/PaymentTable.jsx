@@ -2,7 +2,12 @@ import React, { useCallback, useState, useEffect } from "react";
 import { CurrencyInput } from "../CurrencyInput";
 import styles from "./PaymentTable.module.css";
 
-const PaymentTable = ({ payment, onPaymentChange, customerName, isEdit }) => {
+const PaymentTable = ({
+  payment = {},
+  onPaymentChange,
+  customerName,
+  isEdit,
+}) => {
   const [isDateSelected, setIsDateSelected] = useState(false);
 
   useEffect(() => {
@@ -14,12 +19,25 @@ const PaymentTable = ({ payment, onPaymentChange, customerName, isEdit }) => {
 
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
-      onPaymentChange({
+      const updatedPayment = {
         ...payment,
         [`${field}Amount`]: amount !== null ? Number(amount) : null,
         [`${field}Currency`]: currency || null,
         [`${field}ConvertedAmount`]:
           convertedAmount !== null ? Number(convertedAmount) : null,
+      };
+
+      // 총 원화환산액 계산
+      const totalConvertedAmount = ["cash", "card", "tradeIn"].reduce(
+        (sum, method) => {
+          return sum + (updatedPayment[`${method}ConvertedAmount`] || 0);
+        },
+        0
+      );
+
+      onPaymentChange({
+        ...updatedPayment,
+        totalConvertedAmount,
       });
     },
     [onPaymentChange, payment]

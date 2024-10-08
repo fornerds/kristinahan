@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button, Input } from "../../components";
 import PaymentTable from "./PaymentTable/PaymentTable";
+import { Modal } from "../Modal";
 import styles from "./OrderForm.module.css";
 import {
   useSaveOrder,
@@ -33,8 +34,8 @@ export const OrderCreateForm = ({
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
   const [formData, setFormData] = useState({
     event_id: event_id,
-    author_id: "",
-    affiliation_id: "",
+    author_id: null,
+    affiliation_id: null,
     orderName: "",
     contact: "",
     address: "",
@@ -66,6 +67,8 @@ export const OrderCreateForm = ({
   const [customerName, setCustomerName] = useState("");
   const [payerName, setPayerName] = useState("");
   const [isPayerSameAsCustomer, setIsPayerSameAsCustomer] = useState(false);
+  const [affiliationError, setAffiliationError] = useState("");
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
   const [balanceTotal, setBalanceTotal] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
@@ -73,7 +76,7 @@ export const OrderCreateForm = ({
   const [groupedProducts, setGroupedProducts] = useState({});
   const [payments, setPayments] = useState([
     {
-      payment_date: new Date().toISOString(),
+      payment_date: null,
       paymentMethod: "advance",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -84,7 +87,7 @@ export const OrderCreateForm = ({
       notes: "",
     },
     {
-      payment_date: new Date().toISOString(),
+      payment_date: null,
       paymentMethod: "balance",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -158,9 +161,26 @@ export const OrderCreateForm = ({
     setFormData((prev) => ({ ...prev, contact: value }));
   };
 
+  const validateAffiliation = () => {
+    if (!formData.affiliation_id) {
+      setAffiliationError("소속을 선택해주세요.");
+      setIsErrorModalOpen(true);
+      return false;
+    }
+    setAffiliationError("");
+    return true;
+  };
+
+  const closeErrorModal = () => {
+    setIsErrorModalOpen(false);
+  };
+
   const handleAffiliationChange = (e) => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, affiliation_id: value }));
+    if (value) {
+      setAffiliationError("");
+    }
   };
 
   const handleAddressChange = (e) => {
@@ -186,24 +206,22 @@ export const OrderCreateForm = ({
         return newPayments;
       });
 
-      const calculateTotal = (payment) => {
-        return (
-          Number(payment.cashConvertedAmount || 0) +
-          Number(payment.cardConvertedAmount || 0) +
-          Number(payment.tradeInConvertedAmount || 0)
-        );
-      };
-
-      const total = calculateTotal(updatedPayment);
-
       if (updatedPayment.paymentMethod === "advance") {
-        setPrepaymentTotal(total);
+        setPrepaymentTotal(updatedPayment.totalConvertedAmount || 0);
       } else if (updatedPayment.paymentMethod === "balance") {
-        setBalanceTotal(total);
+        setBalanceTotal(updatedPayment.totalConvertedAmount || 0);
       }
     },
     []
   );
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      advancePayment: prepaymentTotal,
+      balancePayment: balanceTotal,
+    }));
+  }, [prepaymentTotal, balanceTotal]);
 
   const handleAlterationChange = (field, value) => {
     setFormData((prev) => ({
@@ -305,21 +323,31 @@ export const OrderCreateForm = ({
   }, [selectedProducts, prepaymentTotal, balanceTotal]);
 
   const handleSubmit = async (isTemp = false) => {
+    if (!validateAffiliation()) {
+      return;
+    }
+
+    // 안전한 정수 파싱 함수
+    const safeParseInt = (value) => {
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? null : parsed;
+    };
+
     const orderItems = Object.entries(selectedProducts)
       .map(([categoryId, item]) => {
         const product = groupedProducts[categoryId]?.find(
-          (p) => p.id === parseInt(item.productId, 10)
+          (p) => p.id === safeParseInt(item.productId)
         );
         const price = product ? product.price : 0;
-        const quantity = parseInt(item.quantity, 10);
+        const quantity = safeParseInt(item.quantity) || 0;
         return {
-          product_id: parseInt(item.productId, 10),
+          product_id: safeParseInt(item.productId),
           attributes_id: item.attributes[0]?.id || null,
           quantity: quantity,
           price: price * quantity,
         };
       })
-      .filter((item) => item.product_id);
+      .filter((item) => item.product_id !== null);
 
     const totalItemsPrice = orderItems.reduce(
       (sum, item) => sum + item.price,
@@ -341,7 +369,7 @@ export const OrderCreateForm = ({
       payment_date: payment.payment_date,
       cashAmount: Number(payment.cashAmount) || 0,
       cashCurrency: payment.cashCurrency,
-      cardAmount: Number(payment.cardAmoun) || 0,
+      cardAmount: Number(payment.cardAmount) || 0,
       cardCurrency: payment.cardCurrency,
       tradeInAmount: Number(payment.tradeInAmount) || null,
       tradeInCurrency: payment.tradeInAmount
@@ -353,10 +381,10 @@ export const OrderCreateForm = ({
 
     const orderData = {
       ...formData,
-      event_id: parseInt(event_id, 10),
-      author_id: parseInt(formData.author_id, 10),
-      modifier_id: parseInt(formData.author_id, 10),
-      affiliation_id: parseInt(formData.affiliation_id, 10),
+      event_id: safeParseInt(event_id),
+      author_id: safeParseInt(formData.author_id),
+      modifier_id: safeParseInt(formData.author_id),
+      affiliation_id: safeParseInt(formData.affiliation_id),
       totalPrice: totalItemsPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
@@ -365,18 +393,18 @@ export const OrderCreateForm = ({
       alteration_details: {
         ...formData.alteration_details,
         jacketSleeve:
-          parseInt(formData.alteration_details.jacketSleeve, 10) || 0,
+          safeParseInt(formData.alteration_details.jacketSleeve) || 0,
         jacketLength:
-          parseInt(formData.alteration_details.jacketLength, 10) || 0,
-        jacketForm: parseInt(formData.alteration_details.jacketForm, 10) || 0,
+          safeParseInt(formData.alteration_details.jacketLength) || 0,
+        jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
         pantsCircumference:
-          parseInt(formData.alteration_details.pantsCircumference, 10) || 0,
-        pantsLength: parseInt(formData.alteration_details.pantsLength, 10) || 0,
-        shirtNeck: parseInt(formData.alteration_details.shirtNeck, 10) || 0,
-        shirtSleeve: parseInt(formData.alteration_details.shirtSleeve, 10) || 0,
+          safeParseInt(formData.alteration_details.pantsCircumference) || 0,
+        pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
+        shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
+        shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
         dressBackForm:
-          parseInt(formData.alteration_details.dressBackForm, 10) || 0,
-        dressLength: parseInt(formData.alteration_details.dressLength, 10) || 0,
+          safeParseInt(formData.alteration_details.dressBackForm) || 0,
+        dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
       },
     };
 
@@ -400,7 +428,9 @@ export const OrderCreateForm = ({
       }
     } catch (error) {
       console.error("Order save failed:", error);
-      // 에러 처리 로직
+      alert(
+        "주문 저장에 실패했습니다. 모든 필수 필드를 입력했는지 확인해주세요."
+      );
     }
   };
 
@@ -899,6 +929,13 @@ export const OrderCreateForm = ({
           {isEdit ? "수정 완료" : "작성 완료"}
         </Button>
       </div>
+
+      <Modal
+        isOpen={isErrorModalOpen}
+        onClose={closeErrorModal}
+        title="소속 선택 오류"
+        message={affiliationError}
+      />
     </>
   );
 };
