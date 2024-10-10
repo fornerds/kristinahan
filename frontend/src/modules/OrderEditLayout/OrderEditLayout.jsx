@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button, Link } from "../../components";
 import { Modal } from "../Modal";
@@ -19,6 +19,8 @@ export const OrderEditLayout = () => {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderData, setOrderData] = useState(null);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const printableAreaRef = useRef(null);
 
   const { data: orderDetails, isLoading, error } = useOrderDetails(order_id);
@@ -32,8 +34,6 @@ export const OrderEditLayout = () => {
   } = useEventDetails(event_id);
 
   const eventData = eventResponse?.data;
-
-  const isEdit = !!order_id;
   const isAdminOrderCreate = location.pathname.startsWith("/admin/order");
   const backLink = isAdminOrderCreate ? "/admin/order" : `/event/${event_id}`;
 
@@ -43,22 +43,54 @@ export const OrderEditLayout = () => {
     }
   }, [orderDetails]);
 
-  console.log(orderDetails?.data);
+  const [prepareOrderData, setPrepareOrderData] = useState(() => () => ({}));
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setOrderData((prev) => ({ ...prev, [name]: value }));
-  };
+  const handleSave = useCallback(
+    async (isTemp = false) => {
+      if (typeof prepareOrderData !== "function") {
+        console.error("prepareOrderData is not a function");
+        setErrorMessage("주문 데이터를 준비하는 중 오류가 발생했습니다.");
+        setIsErrorModalOpen(true);
+        return;
+      }
 
-  const handleSave = async (isTemp = false) => {
-    try {
-      await updateOrderMutation.mutateAsync({ order_id, orderData, isTemp });
-      setIsConfirmModalOpen(true);
-    } catch (error) {
-      console.error("Failed to update order:", error);
-      // 에러 처리 로직 추가
+      const orderData = prepareOrderData();
+      console.log("Submitting order data:", orderData);
+
+      try {
+        await updateOrderMutation.mutateAsync({
+          orderId: parseInt(order_id, 10),
+          orderData: orderData,
+          isTemp: false,
+        });
+        setIsConfirmModalOpen(true);
+      } catch (error) {
+        console.error("Failed to update order:", error);
+        let errorMsg = "주문서 수정 중 오류가 발생했습니다.";
+        if (error.response) {
+          if (error.response.status === 422) {
+            errorMsg =
+              "입력값이 올바르지 않습니다. 모든 필수 항목을 확인해주세요.";
+          } else if (error.response.data?.detail) {
+            errorMsg = Array.isArray(error.response.data.detail)
+              ? error.response.data.detail[0]?.msg || errorMsg
+              : error.response.data.detail;
+          }
+        }
+        setErrorMessage(errorMsg);
+        setIsErrorModalOpen(true);
+      }
+    },
+    [order_id, prepareOrderData, updateOrderMutation]
+  );
+
+  const handlePrepareOrderData = useCallback((prepareFunction) => {
+    if (typeof prepareFunction === "function") {
+      setPrepareOrderData(() => prepareFunction);
+    } else {
+      console.error("Received invalid prepareOrderData:", prepareFunction);
     }
-  };
+  }, []);
 
   const handleDelete = async () => {
     try {
@@ -66,7 +98,8 @@ export const OrderEditLayout = () => {
       navigate(`/event/${event_id}`);
     } catch (error) {
       console.error("Failed to delete order:", error);
-      // 에러 처리 로직 추가
+      setErrorMessage("주문서 삭제 중 오류가 발생했습니다.");
+      setIsErrorModalOpen(true);
     }
   };
 
@@ -126,12 +159,9 @@ export const OrderEditLayout = () => {
           {orderData && (
             <OrderForm
               event_id={event_id}
-              isEdit={true}
               orderId={order_id}
               initialData={orderData}
-              onInputChange={handleInputChange}
-              onSave={() => handleSave(true)}
-              onComplete={() => handleSave(false)}
+              onSave={handlePrepareOrderData}
             />
           )}
         </div>
@@ -149,7 +179,7 @@ export const OrderEditLayout = () => {
             onClick={() => setIsDeleteModalOpen(true)}
           />
           <Button
-            label="수정 완료"
+            label="수정하기"
             className={styles.actionButton}
             onClick={() => handleSave(false)}
           />
@@ -163,7 +193,7 @@ export const OrderEditLayout = () => {
         confirmLabel="확인"
         onConfirm={() => {
           setIsConfirmModalOpen(false);
-          navigate(`/event/${event_id}`);
+          navigate(backLink);
         }}
       />
       <Modal
@@ -175,6 +205,14 @@ export const OrderEditLayout = () => {
         cancelLabel="취소"
         onConfirm={handleDelete}
         onCancel={() => setIsDeleteModalOpen(false)}
+      />
+      <Modal
+        isOpen={isErrorModalOpen}
+        onClose={() => setIsErrorModalOpen(false)}
+        title="오류 발생"
+        message={errorMessage}
+        confirmLabel="확인"
+        onConfirm={() => setIsErrorModalOpen(false)}
       />
     </div>
   );

@@ -174,11 +174,12 @@ export const useSaveTempOrder = () => {
 export const useUpdateOrder = () => {
   const queryClient = useQueryClient();
   return useMutation(
-    ({ orderId, orderData, isTemp }) => api.saveOrder(orderData, true, isTemp),
+    ({ orderId, orderData, isTemp }) =>
+      api.saveOrder(orderData, orderId, isTemp),
     {
-      onSuccess: () => {
+      onSuccess: (data, variables) => {
         queryClient.invalidateQueries("orders");
-        queryClient.invalidateQueries(["order"]);
+        queryClient.invalidateQueries(["order", variables.orderId]);
       },
     }
   );

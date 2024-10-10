@@ -48,6 +48,7 @@
 }
 
 #writer,
+#rewriter,
 .currency {
   border: 1px solid var(--cancel-color);
   border-radius: 6px;

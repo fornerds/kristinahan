@@ -29,24 +29,32 @@ export const CurrencyInput = React.memo(
       "24K": 1,
     });
 
-    const fetchExchangeRates = async (date) => {
-      try {
-        const response = await axios.get(
-          `https://kristinahan-db64be049567.herokuapp.com/getExchangeRateInfo?search_date=${date}`
-        );
-        const rates = response.data.items.reduce((acc, item) => {
-          if (item.cur_unit === "JPY(100)") {
-            acc["JPY"] = item.deal_bas_r / 100; // 100엔당 가격을 1엔당 가격으로 변환
-          } else {
-            acc[item.cur_unit] = item.deal_bas_r;
-          }
-          return acc;
-        }, {});
-        return rates;
-      } catch (error) {
-        console.error("Failed to fetch exchange rates:", error);
-        return null;
-      }
+    // const fetchExchangeRates = async (date) => {
+    //   try {
+    //     const response = await axios.get(
+    //       `https://kristinahan-db64be049567.herokuapp.com/getExchangeRateInfo?search_date=${date}`
+    //     );
+    //     const rates = response.data.items.reduce((acc, item) => {
+    //       if (item.cur_unit === "JPY(100)") {
+    //         acc["JPY"] = item.deal_bas_r / 100; // 100엔당 가격을 1엔당 가격으로 변환
+    //       } else {
+    //         acc[item.cur_unit] = item.deal_bas_r;
+    //       }
+    //       return acc;
+    //     }, {});
+    //     return rates;
+    //   } catch (error) {
+    //     console.error("Failed to fetch exchange rates:", error);
+    //     return null;
+    //   }
+    // };
+
+    const fetchExchangeRates = (date) => {
+      return {
+        KRW: 1,
+        JPY: 9,
+        USD: 1300,
+      };
     };
 
     const fetchGoldPrices = async (date) => {

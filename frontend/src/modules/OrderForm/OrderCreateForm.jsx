@@ -383,7 +383,7 @@ export const OrderCreateForm = ({
       ...formData,
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
-      modifier_id: safeParseInt(formData.author_id),
+      modifier_id: null,
       affiliation_id: safeParseInt(formData.affiliation_id),
       totalPrice: totalItemsPrice,
       advancePayment: prepaymentTotal,
@@ -408,7 +408,7 @@ export const OrderCreateForm = ({
       },
     };
 
-    console.log(orderData);
+    //console.log(orderData);
 
     try {
       if (isTemp) {
@@ -583,6 +583,7 @@ export const OrderCreateForm = ({
               value={formData.collectionMethod}
               onChange={handleCollectionMethodChange}
             >
+              <option value="">선택</option>
               <option value="Delivery">배송</option>
               <option value="Pickup on site">현장수령 (기혼 불가)</option>
               <option value="Pickup in store">매장수령</option>
