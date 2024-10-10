@@ -14,18 +14,14 @@ import {
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
-  Order_Completed: "주문완료",
-  Packaging_Completed: "포장완료",
-  Repair_Received: "수선접수",
-  Repair_Completed: "수선완료",
-  In_delivery: "배송중",
-  Delivery_completed: "배송완료",
-  Receipt_completed: "수령완료",
+  "Order Completed": "주문완료",
+  "Packaging Completed": "포장완료",
+  "Repair Received": "수선접수",
+  "Repair Completed": "수선완료",
+  "In delivery": "배송중",
+  "Delivery completed": "배송완료",
+  "Receipt completed": "수령완료",
   Accommodation: "숙소",
-};
-
-const convertStatusToApiFormat = (status) => {
-  return status.replace(/ /g, "_");
 };
 
 const convertStatusFromApiFormat = (status) => {
@@ -84,7 +80,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const [payments, setPayments] = useState([
     {
       payment_date: null,
-      paymentMethod: "advance",
+      paymentMethod: "ADVANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
@@ -95,7 +91,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     },
     {
       payment_date: null,
-      paymentMethod: "balance",
+      paymentMethod: "BALANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
@@ -114,6 +110,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     });
     return newGroupedProducts;
   }, [categories, event, orderCategories]);
+
+  console.log(groupedProducts);
 
   useEffect(() => {
     if (orderData?.data && categories?.data) {
@@ -160,12 +158,17 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       });
       setSelectedProducts(newSelectedProducts);
 
-      setPayments(
-        orderDetails.payments.map((payment) => ({
-          ...payment,
-          paymentMethod: payment.paymentMethod.toLowerCase(),
-        }))
-      );
+      const advancePayment =
+        orderDetails.payments.find((p) => p.paymentMethod === "ADVANCE") ||
+        payments[0];
+      const balancePayment =
+        orderDetails.payments.find((p) => p.paymentMethod === "BALANCE") ||
+        payments[1];
+
+      setPayments([
+        { ...advancePayment, paymentMethod: "ADVANCE" },
+        { ...balancePayment, paymentMethod: "BALANCE" },
+      ]);
     }
   }, [orderData, categories]);
 
@@ -255,6 +258,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
+      console.log(
+        `handleProductChange called: categoryId=${categoryId}, field=${field}, value=${value}`
+      );
       setSelectedProducts((prev) => {
         const newState = { ...prev };
         if (field === "productId") {
@@ -262,13 +268,14 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === productId
           );
+          console.log("Selected product:", selectedProduct);
           if (selectedProduct) {
             newState[categoryId] = {
               productId: selectedProduct.id,
               price: selectedProduct.price,
               quantity: 1,
               attributes: selectedProduct.attributes.map((attr) => ({
-                id: attr.attribute_id,
+                id: attr.id,
                 value: "",
               })),
             };
@@ -281,16 +288,35 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
             };
           }
         } else if (field === "attributes") {
-          newState[categoryId] = {
-            ...newState[categoryId],
-            attributes: [{ id: value.id, value: value.value }],
-          };
+          const selectedProduct = groupedProducts[categoryId]?.find(
+            (p) => p.id === newState[categoryId].productId
+          );
+          console.log("Selected product for attributes:", selectedProduct);
+          if (selectedProduct) {
+            const selectedAttributeId = parseInt(value, 10);
+            const selectedAttribute = selectedProduct.attributes.find(
+              (attr) => attr.id === selectedAttributeId
+            );
+            console.log("Selected attribute:", selectedAttribute);
+            if (selectedAttribute) {
+              newState[categoryId] = {
+                ...newState[categoryId],
+                attributes: [
+                  {
+                    id: selectedAttribute.id,
+                    value: selectedAttribute.value,
+                  },
+                ],
+              };
+            }
+          }
         } else {
           newState[categoryId] = {
             ...newState[categoryId],
             [field]: value,
           };
         }
+        console.log("newState", newState);
         return newState;
       });
     },
@@ -331,11 +357,16 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       return isNaN(parsed) ? null : parsed;
     };
 
+    console.log("selectedProducts", selectedProducts);
+
     const orderItems = Object.values(selectedProducts)
       .filter((item) => item.productId)
       .map((item) => ({
         product_id: safeParseInt(item.productId),
-        attributes_id: item.attributes[0]?.id || null,
+        attributes_id:
+          item.attributes && item.attributes.length > 0
+            ? safeParseInt(item.attributes[0].id)
+            : null,
         quantity: safeParseInt(item.quantity) || 0,
         price: item.price * (safeParseInt(item.quantity) || 0),
       }));
@@ -373,7 +404,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       author_id: safeParseInt(formData.author_id),
       modifier_id: safeParseInt(formData.modifier_id),
       affiliation_id: safeParseInt(formData.affiliation_id),
-      status: convertStatusToApiFormat(formData.status),
+      status: formData.status,
       totalPrice: totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
@@ -620,17 +651,18 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
                   <td>
                     {productInfo?.productId && (
                       <select
-                        value={productInfo?.attributes?.[0]?.value || ""}
+                        value={productInfo?.attributes?.[0]?.id || ""}
                         onChange={(e) =>
-                          handleProductChange(category.id, "attributes", {
-                            id: selectedProduct?.attributes?.[0]?.attribute_id,
-                            value: e.target.value,
-                          })
+                          handleProductChange(
+                            category.id,
+                            "attributes",
+                            e.target.value
+                          )
                         }
                       >
                         <option value="">선택</option>
                         {selectedProduct?.attributes?.map((attr) => (
-                          <option key={attr.attribute_id} value={attr.value}>
+                          <option key={attr.id} value={attr.id}>
                             {attr.value}
                           </option>
                         ))}
@@ -668,17 +700,25 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>결제정보</h3>
 
-        {payments.map((payment, index) => (
-          <PaymentTable
-            key={index}
-            payment={payment}
-            onPaymentChange={(updatedPayment) =>
-              handlePaymentChange(index, updatedPayment)
-            }
-            customerName={customerName}
-            isEdit={true}
-          />
-        ))}
+        <PaymentTable
+          payment={payments[0]}
+          onPaymentChange={(updatedPayment) =>
+            handlePaymentChange(0, updatedPayment)
+          }
+          customerName={customerName}
+          isEdit={true}
+          label="선입금"
+        />
+
+        <PaymentTable
+          payment={payments[1]}
+          onPaymentChange={(updatedPayment) =>
+            handlePaymentChange(1, updatedPayment)
+          }
+          customerName={customerName}
+          isEdit={true}
+          label="잔금"
+        />
 
         <div className={styles.calculator}>
           <div className={styles.spacebetween}>

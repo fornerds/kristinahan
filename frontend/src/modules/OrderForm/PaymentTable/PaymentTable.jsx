@@ -7,6 +7,7 @@ const PaymentTable = ({
   onPaymentChange,
   customerName,
   isEdit,
+  label,
 }) => {
   const [isDateSelected, setIsDateSelected] = useState(false);
 
@@ -77,9 +78,7 @@ const PaymentTable = ({
   return (
     <div className={styles.sectionVerticalGroup}>
       <div className={styles.spacebetween}>
-        <h4 className={styles.sectionLabel}>
-          {payment.paymentMethod === "advance" ? "선입금" : "잔금"} 관련
-        </h4>
+        <h4 className={styles.sectionLabel}>{label} 관련</h4>
         <div className={styles.sectionGroup}>
           <h4 className={styles.sectionLabel}>지급날짜</h4>
           <input

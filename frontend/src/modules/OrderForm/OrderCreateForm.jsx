@@ -14,14 +14,18 @@ import {
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
-  Order_Completed: "주문완료",
-  Packaging_Completed: "포장완료",
-  Repair_Received: "수선접수",
-  Repair_Completed: "수선완료",
-  In_delivery: "배송중",
-  Delivery_completed: "배송완료",
-  Receipt_completed: "수령완료",
+  "Order Completed": "주문완료",
+  "Packaging Completed": "포장완료",
+  "Repair Received": "수선접수",
+  "Repair Completed": "수선완료",
+  "In delivery": "배송중",
+  "Delivery completed": "배송완료",
+  "Receipt completed": "수령완료",
   Accommodation: "숙소",
+};
+
+const convertStatusFromApiFormat = (status) => {
+  return status.replace(/_/g, " ");
 };
 
 export const OrderCreateForm = ({
@@ -77,24 +81,24 @@ export const OrderCreateForm = ({
   const [payments, setPayments] = useState([
     {
       payment_date: null,
-      paymentMethod: "advance",
+      paymentMethod: "ADVANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
       cardCurrency: "KRW",
       tradeInAmount: 0,
-      tradeInCurrency: "GOLD_24K",
+      tradeInCurrency: "",
       notes: "",
     },
     {
       payment_date: null,
-      paymentMethod: "balance",
+      paymentMethod: "BALANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
       cardCurrency: "KRW",
       tradeInAmount: 0,
-      tradeInCurrency: "GOLD_24K",
+      tradeInCurrency: "",
       notes: "",
     },
   ]);
@@ -206,9 +210,9 @@ export const OrderCreateForm = ({
         return newPayments;
       });
 
-      if (updatedPayment.paymentMethod === "advance") {
+      if (updatedPayment.paymentMethod === "ADVANCE") {
         setPrepaymentTotal(updatedPayment.totalConvertedAmount || 0);
-      } else if (updatedPayment.paymentMethod === "balance") {
+      } else if (updatedPayment.paymentMethod === "BALANCE") {
         setBalanceTotal(updatedPayment.totalConvertedAmount || 0);
       }
     },
@@ -375,12 +379,13 @@ export const OrderCreateForm = ({
       tradeInCurrency: payment.tradeInAmount
         ? convertTradeInCurrency(payment.tradeInCurrency)
         : null,
-      paymentMethod: payment.paymentMethod.toUpperCase(),
+      paymentMethod: payment.paymentMethod,
       notes: payment.notes,
     }));
 
     const orderData = {
       ...formData,
+      status: convertStatusFromApiFormat(orderDetails.status),
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
       modifier_id: null,
@@ -717,12 +722,14 @@ export const OrderCreateForm = ({
           onPaymentChange={handlePaymentChange(0)}
           customerName={customerName}
           isEdit={false}
+          label="선입금"
         />
         <PaymentTable
           payment={payments[1]}
           onPaymentChange={handlePaymentChange(1)}
           customerName={customerName}
           isEdit={false}
+          label="잔금"
         />
 
         <div className={styles.calculator}>
