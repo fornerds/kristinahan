@@ -95,7 +95,7 @@ export const OrderEditLayout = () => {
   const handleDelete = async () => {
     try {
       await deleteOrderMutation.mutateAsync(order_id);
-      navigate(`/event/${event_id}`);
+      navigate(backLink);
     } catch (error) {
       console.error("Failed to delete order:", error);
       setErrorMessage("주문서 삭제 중 오류가 발생했습니다.");

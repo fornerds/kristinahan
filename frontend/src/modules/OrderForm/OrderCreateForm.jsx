@@ -49,7 +49,7 @@ export const OrderCreateForm = ({
     advancePayment: 0,
     balancePayment: 0,
     isTemporary: false,
-    status: "",
+    status: "Order Completed",
     orderItems: [],
     payments: [],
     alteration_details: {
@@ -385,7 +385,9 @@ export const OrderCreateForm = ({
 
     const orderData = {
       ...formData,
-      status: convertStatusFromApiFormat(orderDetails.status),
+      status: orderDetails
+        ? convertStatusFromApiFormat(orderDetails.status)
+        : "Order Completed",
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
       modifier_id: null,
@@ -434,7 +436,7 @@ export const OrderCreateForm = ({
     } catch (error) {
       console.error("Order save failed:", error);
       alert(
-        "주문 저장에 실패했습니다. 모든 필수 필드를 입력했는지 확인해주세요."
+        "주문 저장에 실패했습니다. 주문 저장 과정과 개발자 모드의 에러메시지를 개발자에게 전달해주시면 빠르게 도와드리겠습니다."
       );
     }
   };
