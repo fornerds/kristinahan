@@ -20,25 +20,45 @@ const PaymentTable = ({
 
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
+      // 입력값 로깅
+      console.log(`Currency Change for ${field}:`, {
+        amount,
+        currency,
+        convertedAmount, // 환율 적용된 값
+      });
+
       const updatedPayment = {
         ...payment,
-        [`${field}Amount`]: amount !== null ? Number(amount) : null,
+        [`${field}Amount`]: amount !== null ? Number(amount) : 0,
         [`${field}Currency`]: currency || null,
-        [`${field}ConvertedAmount`]:
-          convertedAmount !== null ? Number(convertedAmount) : null,
       };
 
+      // 각 필드별 convertedAmount 계산 및 로깅
+      const cashConvertedAmount =
+        field === "cash" ? convertedAmount : payment.cashAmount || 0;
+      const cardConvertedAmount =
+        field === "card" ? convertedAmount : payment.cardAmount || 0;
+      const tradeInConvertedAmount =
+        field === "tradeIn" ? convertedAmount : payment.tradeInAmount || 0;
+
+      console.log("Converted amounts:", {
+        cash: cashConvertedAmount,
+        card: cardConvertedAmount,
+        tradeIn: tradeInConvertedAmount,
+      });
+
       // 총 원화환산액 계산
-      const totalConvertedAmount = ["cash", "card", "tradeIn"].reduce(
-        (sum, method) => {
-          return sum + (updatedPayment[`${method}ConvertedAmount`] || 0);
-        },
-        0
-      );
+      const totalConvertedAmount =
+        (cashConvertedAmount || 0) +
+        (cardConvertedAmount || 0) +
+        (tradeInConvertedAmount || 0);
+
+      console.log("Total converted amount:", totalConvertedAmount);
 
       onPaymentChange({
         ...updatedPayment,
         totalConvertedAmount,
+        paymentMethod: payment.paymentMethod,
       });
     },
     [onPaymentChange, payment]

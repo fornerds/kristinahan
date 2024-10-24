@@ -37,7 +37,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const { data: affiliations, isLoading: isLoadingAffiliations } =
     useAffiliations();
 
-  console.log(orderData?.data);
+  // console.log(orderData?.data);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -111,7 +111,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     return newGroupedProducts;
   }, [categories, event, orderCategories]);
 
-  console.log(groupedProducts);
+  // console.log(groupedProducts);
 
   useEffect(() => {
     if (orderData?.data && categories?.data) {
@@ -258,9 +258,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
-      console.log(
-        `handleProductChange called: categoryId=${categoryId}, field=${field}, value=${value}`
-      );
+      // console.log(
+      //   `handleProductChange called: categoryId=${categoryId}, field=${field}, value=${value}`
+      // );
       setSelectedProducts((prev) => {
         const newState = { ...prev };
         if (field === "productId") {
@@ -268,7 +268,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === productId
           );
-          console.log("Selected product:", selectedProduct);
+          // console.log("Selected product:", selectedProduct);
           if (selectedProduct) {
             newState[categoryId] = {
               productId: selectedProduct.id,
@@ -291,13 +291,13 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === newState[categoryId].productId
           );
-          console.log("Selected product for attributes:", selectedProduct);
+          // console.log("Selected product for attributes:", selectedProduct);
           if (selectedProduct) {
             const selectedAttributeId = parseInt(value, 10);
             const selectedAttribute = selectedProduct.attributes.find(
               (attr) => attr.id === selectedAttributeId
             );
-            console.log("Selected attribute:", selectedAttribute);
+            // console.log("Selected attribute:", selectedAttribute);
             if (selectedAttribute) {
               newState[categoryId] = {
                 ...newState[categoryId],
@@ -316,7 +316,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
             [field]: value,
           };
         }
-        console.log("newState", newState);
+        // console.log("newState", newState);
         return newState;
       });
     },
@@ -330,10 +330,20 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       return newPayments;
     });
 
-    if (updatedPayment.paymentMethod === "advance") {
-      setPrepaymentTotal(updatedPayment.totalConvertedAmount || 0);
-    } else if (updatedPayment.paymentMethod === "balance") {
-      setBalanceTotal(updatedPayment.totalConvertedAmount || 0);
+    // 로그를 추가하여 디버깅
+    // console.log("Payment updated:", updatedPayment);
+    // console.log("Payment method:", updatedPayment.paymentMethod);
+    // console.log("Total converted amount:", updatedPayment.totalConvertedAmount);
+
+    // totalConvertedAmount가 undefined인 경우 0으로 처리
+    const amount = updatedPayment.totalConvertedAmount || 0;
+
+    if (updatedPayment.paymentMethod === "ADVANCE") {
+      setPrepaymentTotal(amount);
+      // console.log("Setting prepayment total:", amount);
+    } else if (updatedPayment.paymentMethod === "BALANCE") {
+      setBalanceTotal(amount);
+      // console.log("Setting balance total:", amount);
     }
   }, []);
 
@@ -751,14 +761,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>자켓 소매</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="jacketSleeve"
                 value={formData.alteration_details.jacketSleeve}
-                onChange={(e) =>
-                  handleAlterationChange("jacketSleeve", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("jacketSleeve", value);
+                }}
               />
               {event?.data?.form.jacketSleeve}
             </div>
@@ -766,14 +777,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>자켓 기장</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="jacketLength"
                 value={formData.alteration_details.jacketLength}
-                onChange={(e) =>
-                  handleAlterationChange("jacketLength", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("jacketLength", value);
+                }}
               />
               {event?.data?.form.jacketLength}
             </div>
@@ -781,14 +793,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>자켓 폼</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="jacketForm"
                 value={formData.alteration_details.jacketForm}
-                onChange={(e) =>
-                  handleAlterationChange("jacketForm", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("jacketForm", value);
+                }}
               />
               {event?.data?.form.jacketForm}
             </div>
@@ -799,14 +812,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>셔츠 목</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="shirtNeck"
                 value={formData.alteration_details.shirtNeck}
-                onChange={(e) =>
-                  handleAlterationChange("shirtNeck", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("shirtNeck", value);
+                }}
               />
               {event?.data?.form.shirtNeck}
             </div>
@@ -814,14 +828,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>셔츠 소매</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="shirtSleeve"
                 value={formData.alteration_details.shirtSleeve}
-                onChange={(e) =>
-                  handleAlterationChange("shirtSleeve", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("shirtSleeve", value);
+                }}
               />
               {event?.data?.form.shirtSleeve}
             </div>
@@ -832,14 +847,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>바지 둘레</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="pantsCircumference"
                 value={formData.alteration_details.pantsCircumference}
-                onChange={(e) =>
-                  handleAlterationChange("pantsCircumference", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("pantsCircumference", value);
+                }}
               />
               {event?.data?.form.pantsCircumference}
             </div>
@@ -847,14 +863,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>바지 길이</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="pantsLength"
                 value={formData.alteration_details.pantsLength}
-                onChange={(e) =>
-                  handleAlterationChange("pantsLength", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("pantsLength", value);
+                }}
               />
               {event?.data?.form.pantsLength}
             </div>
@@ -865,14 +882,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>드레스 뒷품</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="dressBackForm"
                 value={formData.alteration_details.dressBackForm}
-                onChange={(e) =>
-                  handleAlterationChange("dressBackForm", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("dressBackForm", value);
+                }}
               />
               {event?.data?.form.dressBackForm}
             </div>
@@ -880,14 +898,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>드레스 기장</h4>
             <div className={styles.sectionGroup}>
-              <input
+              <Input
                 type="number"
                 className={styles.numberInput}
                 name="dressLength"
                 value={formData.alteration_details.dressLength}
-                onChange={(e) =>
-                  handleAlterationChange("dressLength", e.target.value)
-                }
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleAlterationChange("dressLength", value);
+                }}
               />
               {event?.data?.form.dressLength}
             </div>

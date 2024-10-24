@@ -28,7 +28,6 @@ export const OrderCreationLayout = () => {
   const handleConfirm = () => {
     setIsSaveModalOpen(false);
     setIsCreateModalOpen(false);
-    navigate(backLink);
   };
 
   const {

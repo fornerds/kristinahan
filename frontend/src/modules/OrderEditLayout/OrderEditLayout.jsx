@@ -193,7 +193,6 @@ export const OrderEditLayout = () => {
         confirmLabel="확인"
         onConfirm={() => {
           setIsConfirmModalOpen(false);
-          navigate(backLink);
         }}
       />
       <Modal

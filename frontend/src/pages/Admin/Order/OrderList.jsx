@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import * as XLSX from "xlsx/xlsx.mjs";
 import { useNavigate } from "react-router-dom";
 import { Button, Link } from "../../../components";
 import {
@@ -17,6 +18,24 @@ import {
   useDownloadOrders,
 } from "../../../api/hooks";
 import { updateOrderStatus } from "../../../api/api"; // 새로운 API 함수 import
+
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString("ko-KR");
+};
+
+const formatOrderStatus = (status) => {
+  const statusMap = {
+    "Order Completed": "주문완료",
+    "Packaging Completed": "포장완료",
+    "Repair Received": "수선접수",
+    "Repair Completed": "수선완료",
+    "In delivery": "배송중",
+    "Delivery completed": "배송완료",
+    "Receipt completed": "수령완료",
+    Accommodation: "숙소",
+  };
+  return statusMap[status] || status;
+};
 
 export const OrderList = () => {
   const navigate = useNavigate();
@@ -47,6 +66,13 @@ export const OrderList = () => {
     ...filters,
     limit: itemsPerPage,
     offset: (currentPage - 1) * itemsPerPage,
+    order_date_from: filters.order_date_from || undefined,
+    order_date_to: filters.order_date_to || undefined,
+  });
+  const { data: excelData, isLoading: isExcelDataLoading } = useOrders({
+    ...filters,
+    limit: 100000,
+    offset: 0,
     order_date_from: filters.order_date_from || undefined,
     order_date_to: filters.order_date_to || undefined,
   });
@@ -93,25 +119,16 @@ export const OrderList = () => {
     }));
   };
 
-  const downloadOrdersMutation = useDownloadOrders();
+  // const downloadOrdersMutation = useDownloadOrders();
 
-  const handleExcelDownload = useCallback(() => {
-    const downloadParams = {
-      ...filters,
-      limit: total, // 모든 주문서를 다운로드하기 위해 총 개수를 limit으로 설정
-      offset: 0,
-    };
-    downloadOrdersMutation.mutate(downloadParams);
-  }, [downloadOrdersMutation, filters, total]);
-
-  const handleTabChange = (tabName) => {
-    setFilters({
-      ...initialFilters,
-      is_temp: tabName === "tab2",
-    });
-    setCurrentPage(1);
-    refetch();
-  };
+  // const handleExcelDownload = useCallback(() => {
+  //   const downloadParams = {
+  //     ...filters,
+  //     limit: total, // 모든 주문서를 다운로드하기 위해 총 개수를 limit으로 설정
+  //     offset: 0,
+  //   };
+  //   downloadOrdersMutation.mutate(downloadParams);
+  // }, [downloadOrdersMutation, filters, total]);
 
   const getCollectionMethod = (method) => {
     switch (method) {
@@ -124,6 +141,85 @@ export const OrderList = () => {
       default:
         return method;
     }
+  };
+
+  const handleExcelDownload = useCallback(async () => {
+    try {
+      if (isExcelDataLoading) {
+        alert("데이터를 불러오는 중입니다. 잠시만 기다려주세요.");
+        return;
+      }
+
+      if (!excelData?.data?.orders) {
+        throw new Error("데이터를 불러올 수 없습니다.");
+      }
+
+      // 엑셀 데이터 포맷팅
+      const formattedData = excelData.data.orders.map((order) => ({
+        주문번호: order.id,
+        작성자: authors[order.author_id] || order.author_id,
+        주문자: order.orderName,
+        소속: affiliations[order.affiliation_id] || order.affiliation_id,
+        수령방법: getCollectionMethod(order.collectionMethod),
+        주문상태: formatOrderStatus(order.status),
+        주문일자: formatDate(order.created_at),
+        총주문금액: order.totalPrice?.toLocaleString() || "0",
+        선입금: order.advancePayment?.toLocaleString() || "0",
+        잔금: order.balancePayment?.toLocaleString() || "0",
+        총결제금액: (
+          (order.advancePayment || 0) + (order.balancePayment || 0)
+        ).toLocaleString(),
+        결제자: order.payments?.[0]?.payer || order.orderName,
+        주소: order.address || "",
+        행사: order.event_name,
+        연락처: order.contact || "",
+        기타사항: order.notes || "",
+      }));
+
+      // 엑셀 파일 생성
+      const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "주문서목록");
+
+      // 열 너비 자동 조정
+      const max_width = 50;
+      const colWidths = Object.keys(formattedData[0] || {}).map((key) => {
+        const width = Math.min(
+          max_width,
+          Math.max(
+            key.length,
+            ...formattedData.map((row) => String(row[key] || "").length)
+          )
+        );
+        return { wch: width };
+      });
+      worksheet["!cols"] = colWidths;
+
+      // 파일명에 현재 날짜 추가
+      const today = new Date().toISOString().split("T")[0];
+      const fileName = `주문서목록_${today}.xlsx`;
+
+      // 엑셀 파일 다운로드
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      console.error("Excel download failed:", error);
+      alert("엑셀 다운로드에 실패했습니다. 다시 시도해주세요.");
+    }
+  }, [
+    excelData,
+    isExcelDataLoading,
+    authors,
+    affiliations,
+    getCollectionMethod,
+  ]);
+
+  const handleTabChange = (tabName) => {
+    setFilters({
+      ...initialFilters,
+      is_temp: tabName === "tab2",
+    });
+    setCurrentPage(1);
+    refetch();
   };
 
   const handleOrderStatusChange = useCallback(
@@ -259,6 +355,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
+                  disabled={isExcelDataLoading}
                 />
                 <Button
                   label="주문서 작성"
@@ -282,6 +379,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
+                  disabled={isExcelDataLoading}
                 />
                 <Button
                   label="주문서 작성"
