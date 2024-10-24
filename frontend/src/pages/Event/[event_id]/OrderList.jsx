@@ -211,7 +211,7 @@ export const OrderList = () => {
               className={styles.orderLink}
             >
               <td>{authors[order.author_id] || order.author_id}</td>
-              <td>{order.orderName}</td>
+              <td>{order.groomName}</td>
               <td>
                 {affiliations[order.affiliation_id] || order.affiliation_id}
               </td>
@@ -238,7 +238,7 @@ export const OrderList = () => {
               <td>{new Date(order.created_at).toLocaleDateString("ko-KR")}</td>
               <td>{order.totalPrice}</td>
               <td>{order.advancePayment}</td>
-              <td>{order.orderName}</td>
+              <td>{order.groomName}</td>
               <td>{order.address}</td>
             </tr>
           ))

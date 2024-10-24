@@ -43,7 +43,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     event_id: event_id,
     author_id: null,
     affiliation_id: null,
-    orderName: "",
+    groomName: "",
     contact: "",
     address: "",
     collectionMethod: "",
@@ -125,10 +125,10 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         modifier_id: orderDetails.modifier_id || "",
       }));
 
-      setCustomerName(orderDetails.orderName);
+      setCustomerName(orderDetails.groomName);
       setPayerName(orderDetails.payments[0]?.payer || "");
       setIsPayerSameAsCustomer(
-        orderDetails.orderName === orderDetails.payments[0]?.payer
+        orderDetails.groomName === orderDetails.payments[0]?.payer
       );
       setPrepaymentTotal(orderDetails.advancePayment);
       setBalanceTotal(orderDetails.balancePayment);
@@ -248,7 +248,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const handleCustomerNameChange = useCallback(
     (e) => {
       setCustomerName(e.target.value);
-      setFormData((prev) => ({ ...prev, orderName: e.target.value }));
+      setFormData((prev) => ({ ...prev, groomName: e.target.value }));
       if (isPayerSameAsCustomer) {
         setPayerName(e.target.value);
       }

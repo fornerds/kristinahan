@@ -158,7 +158,7 @@ export const OrderList = () => {
       const formattedData = excelData.data.orders.map((order) => ({
         주문번호: order.id,
         작성자: authors[order.author_id] || order.author_id,
-        주문자: order.orderName,
+        주문자: order.groomName,
         소속: affiliations[order.affiliation_id] || order.affiliation_id,
         수령방법: getCollectionMethod(order.collectionMethod),
         주문상태: formatOrderStatus(order.status),
@@ -169,7 +169,7 @@ export const OrderList = () => {
         총결제금액: (
           (order.advancePayment || 0) + (order.balancePayment || 0)
         ).toLocaleString(),
-        결제자: order.payments?.[0]?.payer || order.orderName,
+        결제자: order.payments?.[0]?.payer || order.groomName,
         주소: order.address || "",
         행사: order.event_name,
         연락처: order.contact || "",
@@ -300,7 +300,7 @@ export const OrderList = () => {
               className={styles.orderLink}
             >
               <td>{authors[order.author_id] || order.author_id}</td>
-              <td>{order.orderName}</td>
+              <td>{order.groomName}</td>
               <td>
                 {affiliations[order.affiliation_id] || order.affiliation_id}
               </td>
@@ -327,7 +327,7 @@ export const OrderList = () => {
               <td>{new Date(order.created_at).toLocaleDateString()}</td>
               <td>{order.totalPrice}</td>
               <td>{order.advancePayment + order.balancePayment}</td>
-              <td>{order.orderName}</td>
+              <td>{order.groomName}</td>
               <td>{order.address}</td>
               <td>{order.event_name}</td>
             </tr>
