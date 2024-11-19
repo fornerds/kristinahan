@@ -163,7 +163,8 @@ export const OrderList = () => {
       <thead>
         <tr>
           <th scope="col">작성자</th>
-          <th scope="col">주문자</th>
+          <th scope="col">신랑</th>
+          <th scope="col">신부</th>
           <th scope="col">소속</th>
           <th scope="col">수령방법</th>
           <th scope="col">주문상태</th>
@@ -212,6 +213,7 @@ export const OrderList = () => {
             >
               <td>{authors[order.author_id] || order.author_id}</td>
               <td>{order.groomName}</td>
+              <td>{order.brideName}</td>
               <td>
                 {affiliations[order.affiliation_id] || order.affiliation_id}
               </td>
@@ -238,7 +240,7 @@ export const OrderList = () => {
               <td>{new Date(order.created_at).toLocaleDateString("ko-KR")}</td>
               <td>{order.totalPrice}</td>
               <td>{order.advancePayment}</td>
-              <td>{order.groomName}</td>
+              <td>{order.payerName}</td>
               <td>{order.address}</td>
             </tr>
           ))

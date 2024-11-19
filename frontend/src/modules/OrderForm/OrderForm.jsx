@@ -44,6 +44,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     author_id: null,
     affiliation_id: null,
     groomName: "",
+    brideName: "",
     contact: "",
     address: "",
     collectionMethod: "",
@@ -71,7 +72,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const [orderCategories, setOrderCategories] = useState([]);
   const [customerName, setCustomerName] = useState("");
   const [payerName, setPayerName] = useState("");
-  const [isPayerSameAsCustomer, setIsPayerSameAsCustomer] = useState(false);
   const [affiliationError, setAffiliationError] = useState("");
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
@@ -125,11 +125,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         modifier_id: orderDetails.modifier_id || "",
       }));
 
-      setCustomerName(orderDetails.groomName);
       setPayerName(orderDetails.payments[0]?.payer || "");
-      setIsPayerSameAsCustomer(
-        orderDetails.groomName === orderDetails.payments[0]?.payer
-      );
       setPrepaymentTotal(orderDetails.advancePayment);
       setBalanceTotal(orderDetails.balancePayment);
       setTotalPrice(orderDetails.totalPrice);
@@ -245,16 +241,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     }));
   };
 
-  const handleCustomerNameChange = useCallback(
-    (e) => {
-      setCustomerName(e.target.value);
-      setFormData((prev) => ({ ...prev, groomName: e.target.value }));
-      if (isPayerSameAsCustomer) {
-        setPayerName(e.target.value);
-      }
-    },
-    [isPayerSameAsCustomer]
-  );
+  const handleGroomNameChange = useCallback((e) => {
+    const newGroomName = e.target.value;
+    setFormData((prev) => ({ ...prev, groomName: newGroomName }));
+  });
+
+  const handleBrideNameChange = useCallback((e) => {
+    const newBrideName = e.target.value;
+    setFormData((prev) => ({ ...prev, brideName: newBrideName }));
+  }, []);
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
@@ -392,7 +387,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     };
 
     const paymentsData = payments.map((payment) => ({
-      payer: payment.payerName || customerName,
+      payer: payment.payerName || formData.groomName,
       payment_date: payment.payment_date || new Date().toISOString(),
       cashAmount: safeParseInt(payment.cashAmount) || null,
       cashCurrency: payment.cashAmount ? payment.cashCurrency : null,
@@ -408,6 +403,13 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       notes: payment.notes || "",
     }));
 
+    // alteration_details를 배열로 변환
+    const alterationDetailsArray = [
+      {
+        ...formData.alteration_details,
+      },
+    ];
+
     return {
       ...formData,
       event_id: safeParseInt(event_id),
@@ -420,12 +422,12 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       balancePayment: balanceTotal,
       orderItems: orderItems,
       payments: paymentsData,
+      alteration_details: alterationDetailsArray, // 배열로 변경된 부분
     };
   }, [
     formData,
     selectedProducts,
     payments,
-    customerName,
     totalPrice,
     prepaymentTotal,
     balanceTotal,
@@ -539,14 +541,27 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>주문자</h4>
+            <h4 className={styles.sectionLabel}>신랑</h4>
             <Input
               type="text"
               className={styles.textInput}
-              value={customerName}
-              onChange={handleCustomerNameChange}
+              value={formData.groomName}
+              onChange={handleGroomNameChange}
+              placeholder="신랑 이름"
             />
           </div>
+          <div className={styles.sectionVerticalGroup}>
+            <h4 className={styles.sectionLabel}>신부</h4>
+            <Input
+              type="text"
+              className={styles.textInput}
+              value={formData.brideName}
+              onChange={handleBrideNameChange}
+              placeholder="신부 이름"
+            />
+          </div>
+        </div>
+        <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>
             <Input

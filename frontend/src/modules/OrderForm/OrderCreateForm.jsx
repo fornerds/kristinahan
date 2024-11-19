@@ -41,6 +41,7 @@ export const OrderCreateForm = ({
     author_id: null,
     affiliation_id: null,
     groomName: "",
+    brideName: "",
     contact: "",
     address: "",
     collectionMethod: "",
@@ -237,16 +238,15 @@ export const OrderCreateForm = ({
     }));
   };
 
-  const handleCustomerNameChange = useCallback(
-    (e) => {
-      setCustomerName(e.target.value);
-      setFormData((prev) => ({ ...prev, groomName: e.target.value }));
-      if (isPayerSameAsCustomer) {
-        setPayerName(e.target.value);
-      }
-    },
-    [isPayerSameAsCustomer]
-  );
+  const handleGroomNameChange = useCallback((e) => {
+    const newGroomName = e.target.value;
+    setFormData((prev) => ({ ...prev, groomName: newGroomName }));
+  });
+
+  const handleBrideNameChange = useCallback((e) => {
+    const newBrideName = e.target.value;
+    setFormData((prev) => ({ ...prev, brideName: newBrideName }));
+  }, []);
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
@@ -370,18 +370,38 @@ export const OrderCreateForm = ({
 
     const paymentsData = payments.map((payment) => ({
       payer: payment.payerName || customerName,
-      payment_date: payment.payment_date,
-      cashAmount: Number(payment.cashAmount) || 0,
-      cashCurrency: payment.cashCurrency,
-      cardAmount: Number(payment.cardAmount) || 0,
-      cardCurrency: payment.cardCurrency,
+      payment_date: payment.payment_date || new Date().toISOString(),
+      cashAmount: Number(payment.cashAmount) || null,
+      cashCurrency: payment.cashAmount ? payment.cashCurrency : null,
+      cardAmount: Number(payment.cardAmount) || null,
+      cardCurrency: payment.cardAmount ? payment.cardCurrency : null,
       tradeInAmount: Number(payment.tradeInAmount) || null,
       tradeInCurrency: payment.tradeInAmount
         ? convertTradeInCurrency(payment.tradeInCurrency)
         : null,
       paymentMethod: payment.paymentMethod,
-      notes: payment.notes,
+      notes: payment.notes || "",
     }));
+
+    const alterationDetailsArray = [
+      {
+        form_repair_id: event?.data?.form?.id || null,
+        jacketSleeve:
+          safeParseInt(formData.alteration_details.jacketSleeve) || 0,
+        jacketLength:
+          safeParseInt(formData.alteration_details.jacketLength) || 0,
+        jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
+        pantsCircumference:
+          safeParseInt(formData.alteration_details.pantsCircumference) || 0,
+        pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
+        shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
+        shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
+        dressBackForm:
+          safeParseInt(formData.alteration_details.dressBackForm) || 0,
+        dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
+        notes: formData.alteration_details.notes || "",
+      },
+    ];
 
     const orderData = {
       ...formData,
@@ -397,22 +417,8 @@ export const OrderCreateForm = ({
       balancePayment: balanceTotal,
       orderItems: orderItems,
       payments: paymentsData,
-      alteration_details: {
-        ...formData.alteration_details,
-        jacketSleeve:
-          safeParseInt(formData.alteration_details.jacketSleeve) || 0,
-        jacketLength:
-          safeParseInt(formData.alteration_details.jacketLength) || 0,
-        jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
-        pantsCircumference:
-          safeParseInt(formData.alteration_details.pantsCircumference) || 0,
-        pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
-        shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
-        shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
-        dressBackForm:
-          safeParseInt(formData.alteration_details.dressBackForm) || 0,
-        dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
-      },
+      alteration_details: alterationDetailsArray,
+      alter_notes: formData.alteration_details.notes || "",
     };
 
     //console.log(orderData);
@@ -533,14 +539,27 @@ export const OrderCreateForm = ({
 
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>주문자</h4>
+            <h4 className={styles.sectionLabel}>신랑</h4>
             <Input
               type="text"
               className={styles.textInput}
-              value={customerName}
-              onChange={handleCustomerNameChange}
+              value={formData.groomName}
+              onChange={handleGroomNameChange}
+              placeholder="신랑 이름"
             />
           </div>
+          <div className={styles.sectionVerticalGroup}>
+            <h4 className={styles.sectionLabel}>신부</h4>
+            <Input
+              type="text"
+              className={styles.textInput}
+              value={formData.brideName}
+              onChange={handleBrideNameChange}
+              placeholder="신부 이름"
+            />
+          </div>
+        </div>
+        <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>
             <Input

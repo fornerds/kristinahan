@@ -9,51 +9,58 @@ const PaymentTable = ({
   isEdit,
   label,
 }) => {
-  const [isDateSelected, setIsDateSelected] = useState(false);
+  const [isDateSelected, setIsDateSelected] = useState(!!payment.payment_date);
 
+  // 초기 데이터 설정을 위한 useEffect
   useEffect(() => {
-    // 수정 페이지이고 기존 날짜 데이터가 있는 경우
-    if (isEdit && payment.payment_date) {
-      setIsDateSelected(true);
+    if (payment) {
+      let totalConvertedAmount = 0;
+
+      // 현금 결제 데이터가 있는 경우
+      if (payment.cashAmount && payment.cashCurrency) {
+        totalConvertedAmount += Number(payment.cashAmount);
+      }
+      // 카드 결제 데이터가 있는 경우
+      if (payment.cardAmount && payment.cardCurrency) {
+        totalConvertedAmount += Number(payment.cardAmount);
+      }
+      // 보상판매 데이터가 있는 경우
+      if (payment.tradeInAmount && payment.tradeInCurrency) {
+        totalConvertedAmount += Number(payment.tradeInAmount);
+      }
+
+      // 총액이 있는 경우 업데이트
+      if (totalConvertedAmount > 0) {
+        onPaymentChange({
+          ...payment,
+          totalConvertedAmount,
+        });
+      }
     }
-  }, [isEdit, payment.payment_date]);
+  }, [payment, onPaymentChange]);
 
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
-      // 입력값 로깅
-      console.log(`Currency Change for ${field}:`, {
-        amount,
-        currency,
-        convertedAmount, // 환율 적용된 값
-      });
-
       const updatedPayment = {
         ...payment,
         [`${field}Amount`]: amount !== null ? Number(amount) : 0,
         [`${field}Currency`]: currency || null,
       };
 
-      // 각 필드별 convertedAmount 계산 및 로깅
-      const cashConvertedAmount =
-        field === "cash" ? convertedAmount : payment.cashAmount || 0;
-      const cardConvertedAmount =
-        field === "card" ? convertedAmount : payment.cardAmount || 0;
-      const tradeInConvertedAmount =
-        field === "tradeIn" ? convertedAmount : payment.tradeInAmount || 0;
+      // 현재 필드의 환산액 계산
+      const currentFieldAmount =
+        field === "cash" ? Number(amount) || 0 : payment[`${field}Amount`] || 0;
 
-      console.log("Converted amounts:", {
-        cash: cashConvertedAmount,
-        card: cardConvertedAmount,
-        tradeIn: tradeInConvertedAmount,
-      });
+      // 다른 필드들의 기존 금액 합산
+      const otherFieldsAmount = Object.entries(payment)
+        .filter(
+          ([key, value]) =>
+            key.endsWith("Amount") && !key.startsWith(field) && value !== null
+        )
+        .reduce((sum, [_, value]) => sum + Number(value), 0);
 
-      // 총 원화환산액 계산
-      const totalConvertedAmount =
-        (cashConvertedAmount || 0) +
-        (cardConvertedAmount || 0) +
-        (tradeInConvertedAmount || 0);
-
-      console.log("Total converted amount:", totalConvertedAmount);
+      // 총 환산액 계산
+      const totalConvertedAmount = currentFieldAmount + otherFieldsAmount;
 
       onPaymentChange({
         ...updatedPayment,
@@ -80,10 +87,10 @@ const PaymentTable = ({
     });
   };
 
-  const handleSameAsCustomerChange = (e) => {
+  const handleNotesChange = (e) => {
     onPaymentChange({
       ...payment,
-      payerName: e.target.checked ? customerName : "",
+      notes: e.target.value,
     });
   };
 
@@ -109,81 +116,61 @@ const PaymentTable = ({
           />
         </div>
       </div>
-      {isDateSelected && (
-        <>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th scope="col">지급방법</th>
-                <th scope="col">화폐단위</th>
-                <th scope="col">지급액</th>
-                <th scope="col">원화환산액</th>
-              </tr>
-            </thead>
-            <tbody>
-              <CurrencyInput
-                label="현금"
-                currencies={["KRW", "JPY", "USD"]}
-                onChange={handleCurrencyChange("cash")}
-                initialCurrency={payment.cashCurrency}
-                initialAmount={payment.cashAmount}
-                allowNull={false}
-              />
-              <CurrencyInput
-                label="카드"
-                currencies={["KRW", "JPY", "USD"]}
-                onChange={handleCurrencyChange("card")}
-                initialCurrency={payment.cardCurrency}
-                initialAmount={payment.cardAmount}
-                allowNull={false}
-              />
-              <CurrencyInput
-                label="보상판매"
-                currencies={["10K", "14K", "18K", "24K"]}
-                onChange={handleCurrencyChange("tradeIn")}
-                initialCurrency={payment.tradeInCurrency}
-                initialAmount={payment.tradeInAmount}
-                allowNull={true}
-              />
-            </tbody>
-          </table>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>결제자</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={payment.payerName}
-                onChange={handlePayerNameChange}
-              />
-              <div className={styles.sectionGroup}>
-                <input
-                  type="checkbox"
-                  id={`takeCustomerName_${payment.paymentMethod}`}
-                  checked={payment.payerName === customerName}
-                  onChange={handleSameAsCustomerChange}
-                />
-                <label
-                  htmlFor={`takeCustomerName_${payment.paymentMethod}`}
-                  className={styles.checkboxLabel}
-                >
-                  주문자와 동일
-                </label>
-              </div>
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>비고</h4>
-            <textarea
-              value={payment.notes}
-              onChange={(e) =>
-                onPaymentChange({ ...payment, notes: e.target.value })
-              }
-              className={styles.notes}
-            />
-          </div>
-        </>
-      )}
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th scope="col">지급방법</th>
+            <th scope="col">화폐단위</th>
+            <th scope="col">지급액</th>
+            <th scope="col">원화환산액</th>
+          </tr>
+        </thead>
+        <tbody>
+          <CurrencyInput
+            label="현금"
+            currencies={["KRW", "JPY", "USD"]}
+            onChange={handleCurrencyChange("cash")}
+            initialCurrency={payment.cashCurrency || "KRW"}
+            initialAmount={payment.cashAmount || 0}
+            allowNull={false}
+          />
+          <CurrencyInput
+            label="카드"
+            currencies={["KRW", "JPY", "USD"]}
+            onChange={handleCurrencyChange("card")}
+            initialCurrency={payment.cardCurrency || "KRW"}
+            initialAmount={payment.cardAmount || 0}
+            allowNull={false}
+          />
+          <CurrencyInput
+            label="보상판매"
+            currencies={["10K", "14K", "18K", "24K"]}
+            onChange={handleCurrencyChange("tradeIn")}
+            initialCurrency={payment.tradeInCurrency}
+            initialAmount={payment.tradeInAmount || 0}
+            allowNull={true}
+          />
+        </tbody>
+      </table>
+      <div className={styles.sectionVerticalGroup}>
+        <h4 className={styles.sectionLabel}>결제자</h4>
+        <div className={styles.sectionGroup}>
+          <input
+            type="text"
+            className={styles.textInput}
+            value={payment.payerName || ""}
+            onChange={handlePayerNameChange}
+          />
+        </div>
+      </div>
+      <div className={styles.sectionVerticalGroup}>
+        <h4 className={styles.sectionLabel}>비고</h4>
+        <textarea
+          value={payment.notes || ""}
+          onChange={handleNotesChange}
+          className={styles.notes}
+        />
+      </div>
     </div>
   );
 };

@@ -40,6 +40,7 @@ export const OrderEditLayout = () => {
   useEffect(() => {
     if (orderDetails) {
       setOrderData(orderDetails?.data);
+      console.log(orderDetails?.data);
     }
   }, [orderDetails]);
 
