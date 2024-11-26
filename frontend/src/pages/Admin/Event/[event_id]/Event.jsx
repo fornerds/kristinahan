@@ -14,12 +14,12 @@ export const Event = () => {
   const { event_id } = useParams();
   const navigate = useNavigate();
   const {
-    data: eventData,
+    data: event,
     isLoading: isEventLoading,
     isError: isEventError,
   } = useEventDetails(event_id);
   const {
-    data: formsData,
+    data: forms,
     isLoading: isFormsLoading,
     isError: isFormsError,
   } = useForms();
@@ -37,11 +37,6 @@ export const Event = () => {
     title: "",
     message: "",
   });
-
-  const event = eventData?.data;
-  const forms = formsData?.data || [];
-
-  // console.log(event);
 
   useEffect(() => {
     if (event) {
@@ -74,11 +69,6 @@ export const Event = () => {
           inProgress: inProgress,
         },
       });
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "행사가 성공적으로 수정되었습니다.",
-      });
     } catch (error) {
       setModalInfo({
         isOpen: true,
@@ -96,11 +86,6 @@ export const Event = () => {
   const confirmDelete = async () => {
     try {
       await deleteEventMutation.mutateAsync(event_id);
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "행사가 성공적으로 삭제되었습니다.",
-      });
     } catch (error) {
       setModalInfo({
         isOpen: true,
@@ -151,7 +136,7 @@ export const Event = () => {
                   required
                 >
                   <option value="">선택하세요</option>
-                  {forms.map((form) => (
+                  {forms?.map((form) => (
                     <option key={form.id} value={form.id}>
                       {form.name}
                     </option>

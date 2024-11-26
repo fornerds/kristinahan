@@ -1,6 +1,7 @@
 // src/api/hooks.js
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import * as api from "./api";
+import { useNavigate } from "react-router-dom";
 
 // 에러 처리 유틸리티 함수
 const handleApiError = (error) => {
@@ -92,6 +93,7 @@ export const useAllEvents = () => {
 
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   return useMutation((eventData) => api.createEvent(eventData), {
     onError: handleApiError,
@@ -99,12 +101,14 @@ export const useCreateEvent = () => {
       queryClient.invalidateQueries("currentEvents");
       queryClient.invalidateQueries("allEvents");
       alert("이벤트가 성공적으로 생성되었습니다.");
+      navigate("/admin/event");
     },
   });
 };
 
 export const useUpdateEvent = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   return useMutation(
     ({ eventId, eventData }) => api.updateEvent(eventId, eventData),
@@ -115,6 +119,7 @@ export const useUpdateEvent = () => {
         queryClient.invalidateQueries("allEvents");
         queryClient.invalidateQueries(["event", variables.eventId]);
         alert("이벤트가 성공적으로 수정되었습니다.");
+        navigate("/admin/event");
       },
     }
   );
@@ -122,6 +127,7 @@ export const useUpdateEvent = () => {
 
 export const useDeleteEvent = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   return useMutation((eventId) => api.deleteEvent(eventId), {
     onError: handleApiError,
@@ -129,6 +135,7 @@ export const useDeleteEvent = () => {
       queryClient.invalidateQueries("currentEvents");
       queryClient.invalidateQueries("allEvents");
       alert("이벤트가 성공적으로 삭제되었습니다.");
+      navigate("/admin/event");
     },
   });
 };

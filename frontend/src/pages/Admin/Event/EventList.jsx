@@ -28,11 +28,6 @@ export const EventList = () => {
         eventId,
         inProgress: !currentProgress,
       });
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "이벤트 진행 상태가 업데이트되었습니다.",
-      });
     } catch (error) {
       setModalInfo({
         isOpen: true,
@@ -73,7 +68,7 @@ export const EventList = () => {
                 </tr>
               </thead>
               <tbody>
-                {events?.data.map((event) => (
+                {events?.map((event) => (
                   <tr
                     key={event.id}
                     onClick={() => handleRowClick(event.id)}

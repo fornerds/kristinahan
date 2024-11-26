@@ -58,11 +58,6 @@ export const Create = () => {
         end_date: endDate,
         inProgress: inProgress,
       });
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "행사가 성공적으로 생성되었습니다.",
-      });
     } catch (error) {
       setModalInfo({
         isOpen: true,
@@ -121,7 +116,7 @@ export const Create = () => {
                   required
                 >
                   <option value="">주문서 양식 선택</option>
-                  {forms?.data.map((form) => (
+                  {forms?.map((form) => (
                     <option key={form.id} value={form.id}>
                       {form.name}
                     </option>
@@ -175,7 +170,6 @@ export const Create = () => {
                 type="submit"
                 className={styles.saveButton}
                 label="저장"
-                // disabled={!eventName.trim()}
               />
             </div>
           </form>
