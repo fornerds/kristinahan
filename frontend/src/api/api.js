@@ -8,6 +8,11 @@ const api = axios.create({
 // Request 인터셉터
 api.interceptors.request.use(
   (config) => {
+    // Content-Type이 설정되어 있는지 확인
+    if (!config.headers["Content-Type"]) {
+      config.headers["Content-Type"] = "application/json";
+    }
+
     const token = localStorage.getItem("adminToken");
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
@@ -35,22 +40,52 @@ api.interceptors.response.use(
 );
 
 // 인증 API
-export const login = (id, password) => api.post("/login", { id, password });
+export const login = (loginData) => {
+  const formData = new URLSearchParams();
+  formData.append("id", loginData.id);
+  formData.append("password", loginData.password);
 
-export const adminLogin = (id, password) =>
-  api.post("/admin/login", { id, password });
+  return api.post("/login", formData, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+};
 
-export const changeUserPassword = (userId, oldPassword, newPassword) =>
-  api.put(`/user/change-password?user_id=${userId}`, {
+export const adminLogin = (loginData) => {
+  // FormData로 변환
+  const formData = new URLSearchParams();
+  formData.append("id", loginData.id);
+  formData.append("password", loginData.password);
+
+  return api.post("/admin/login", formData, {
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+};
+
+export const changeUserPassword = (userId, oldPassword, newPassword) => {
+  return api.put(
+    `/user/change-password`,
+    {
+      old_password: oldPassword,
+      new_password: newPassword,
+    },
+    {
+      params: {
+        user_id: userId,
+      },
+    }
+  );
+};
+
+export const changeAdminPassword = (oldPassword, newPassword) => {
+  return api.put("/admin/change-password", {
     old_password: oldPassword,
     new_password: newPassword,
   });
-
-export const changeAdminPassword = (oldPassword, newPassword) =>
-  api.put("/admin/change-password", {
-    old_password: oldPassword,
-    new_password: newPassword,
-  });
+};
 
 // 이벤트 API
 export const getCurrentEvents = () => api.get("/event/current");

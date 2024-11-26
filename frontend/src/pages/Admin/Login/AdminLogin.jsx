@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./AdminLogin.module.css";
 import { useForm, Controller } from "react-hook-form";
@@ -15,7 +15,6 @@ const schema = yup
 
 export const AdminLogin = () => {
   const navigate = useNavigate();
-  const [loginError, setLoginError] = useState(null);
   const adminLogin = useAdminLogin();
 
   const {
@@ -30,20 +29,20 @@ export const AdminLogin = () => {
   });
 
   const onSubmit = async (data) => {
-    // console.log("Submitting form with data:", {
-    //   id: 2,
-    //   password: data.password,
-    // });
     try {
-      const result = await adminLogin.mutateAsync({
+      const loginData = {
         id: 2,
-        password: data.password,
-      });
-      localStorage.setItem("adminToken", result?.data.access_token);
-      navigate("/admin/writer");
+        password: data.password.trim(),
+      };
+
+      console.log("Submitting data:", loginData);
+      const response = await adminLogin.mutateAsync(loginData);
+
+      if (response?.data?.access_token) {
+        navigate("/admin/writer");
+      }
     } catch (error) {
-      console.error("Login error:", error);
-      setLoginError("로그인에 실패했습니다. 비밀번호를 확인해주세요.");
+      console.error("Login error:", error.response?.data || error);
     }
   };
 
@@ -76,14 +75,18 @@ export const AdminLogin = () => {
             )}
           </div>
 
-          {loginError && <p className={styles.errorMessage}>{loginError}</p>}
+          {adminLogin.error && (
+            <p className={styles.errorMessage}>
+              로그인에 실패했습니다. 비밀번호를 확인해주세요.
+            </p>
+          )}
 
           <Button
             variant="default"
             size="full"
             type="submit"
-            label={isSubmitting ? "로그인 중.." : "로그인하기"}
-            disabled={isSubmitting}
+            label={adminLogin.isLoading ? "로그인 중.." : "로그인하기"}
+            disabled={adminLogin.isLoading || isSubmitting}
           />
         </form>
       </section>

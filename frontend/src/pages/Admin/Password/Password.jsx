@@ -25,11 +25,16 @@ export const Password = () => {
 
   const handleUserPasswordSubmit = (e) => {
     e.preventDefault();
-    const userId = localStorage.getItem("userId"); // userId를 로컬 스토리지에서 가져옴
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      alert("사용자 ID를 찾을 수 없습니다. 다시 로그인해주세요.");
+      return;
+    }
 
     changeUserPasswordMutation.mutate(
       {
-        userId,
+        userId: parseInt(1),
         oldPassword: userPasswords.old,
         newPassword: userPasswords.new,
       },
@@ -43,6 +48,7 @@ export const Password = () => {
 
   const handleAdminPasswordSubmit = (e) => {
     e.preventDefault();
+
     changeAdminPasswordMutation.mutate(
       {
         oldPassword: adminPasswords.old,

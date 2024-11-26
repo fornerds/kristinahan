@@ -6,6 +6,7 @@ import * as api from "./api";
 const handleApiError = (error) => {
   if (error.response?.status === 401) {
     localStorage.removeItem("adminToken");
+    localStorage.removeItem("userId");
     window.location.href = "/admin/login";
     return;
   }
@@ -17,7 +18,7 @@ const handleApiError = (error) => {
 
 // 인증 관련 hooks
 export const useLogin = () => {
-  return useMutation(({ id, password }) => api.login(id, password), {
+  return useMutation((loginData) => api.login(loginData), {
     onError: handleApiError,
     onSuccess: (response) => {
       const token = response.data.access_token;
@@ -27,11 +28,12 @@ export const useLogin = () => {
 };
 
 export const useAdminLogin = () => {
-  return useMutation(({ id, password }) => api.adminLogin(id, password), {
+  return useMutation((loginData) => api.adminLogin(loginData), {
     onError: handleApiError,
     onSuccess: (response) => {
       const token = response.data.access_token;
       localStorage.setItem("adminToken", token);
+      localStorage.setItem("userId", 2);
     },
   });
 };
