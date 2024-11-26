@@ -5,7 +5,6 @@ import { Modal } from "../Modal";
 import styles from "./OrderForm.module.css";
 import {
   useSaveOrder,
-  useSaveTempOrder,
   useOrderDetails,
   useAuthors,
   useAffiliations,
@@ -104,15 +103,14 @@ export const OrderCreateForm = ({
     },
   ]);
 
+  // API hooks
   const saveOrderMutation = useSaveOrder();
-  const saveTempOrderMutation = useSaveTempOrder();
   const {
     data: orderDetails,
     isLoading: isLoadingOrderDetails,
     error: orderDetailsError,
   } = useOrderDetails(orderId, { enabled: isEdit });
   const { data: categories, isLoading: isCategoriesLoading } = useCategories();
-
   const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
   const { data: affiliations, isLoading: isLoadingAffiliations } =
     useAffiliations();
@@ -141,7 +139,6 @@ export const OrderCreateForm = ({
         }
       });
       setGroupedProducts(newGroupedProducts);
-      // console.log("Grouped Products:", newGroupedProducts); // 추가된 로그
     }
   }, [event, categories, isEdit]);
 
@@ -241,7 +238,7 @@ export const OrderCreateForm = ({
   const handleGroomNameChange = useCallback((e) => {
     const newGroomName = e.target.value;
     setFormData((prev) => ({ ...prev, groomName: newGroomName }));
-  });
+  }, []);
 
   const handleBrideNameChange = useCallback((e) => {
     const newBrideName = e.target.value;
@@ -275,7 +272,6 @@ export const OrderCreateForm = ({
               })
             );
           } else {
-            // 제품이 선택되지 않았을 때 관련 필드 초기화
             newState[categoryId].price = 0;
             newState[categoryId].quantity = 1;
             newState[categoryId].attributes = [];
@@ -331,7 +327,6 @@ export const OrderCreateForm = ({
       return;
     }
 
-    // 안전한 정수 파싱 함수
     const safeParseInt = (value) => {
       const parsed = parseInt(value, 10);
       return isNaN(parsed) ? null : parsed;
@@ -421,22 +416,17 @@ export const OrderCreateForm = ({
       alter_notes: formData.alteration_details.notes || "",
     };
 
-    //console.log(orderData);
-
     try {
+      // 새로운 API 구조에 맞게 수정
+      await saveOrderMutation.mutateAsync({
+        orderData,
+        orderId: isEdit ? orderId : null,
+        isTemp: isTemp,
+      });
+
       if (isTemp) {
-        await saveTempOrderMutation.mutateAsync({
-          orderData,
-          orderId: isEdit ? orderId : null,
-          isTemp: true,
-        });
         onSave();
       } else {
-        await saveOrderMutation.mutateAsync({
-          orderData,
-          orderId: isEdit ? orderId : null,
-          isTemp: false,
-        });
         onComplete();
       }
     } catch (error) {
@@ -559,6 +549,7 @@ export const OrderCreateForm = ({
             />
           </div>
         </div>
+
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>

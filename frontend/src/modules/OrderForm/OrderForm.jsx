@@ -55,15 +55,15 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     isTemporary: false,
     status: "",
     alteration_details: {
-      jacketSleeve: 0,
-      jacketLength: 0,
       jacketForm: 0,
-      pantsCircumference: 0,
-      pantsLength: 0,
-      shirtNeck: 0,
-      shirtSleeve: 0,
-      dressBackForm: 0,
       dressLength: 0,
+      pantsLength: 0,
+      shirtSleeve: 0,
+      jacketLength: 0,
+      dressBackForm: 0,
+      pantsCircumference: 0,
+      shirtNeck: 0,
+      jacketSleeve: 0,
       notes: "",
     },
   });
@@ -120,7 +120,18 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         ...prev,
         ...orderDetails,
         status: convertStatusFromApiFormat(orderDetails.status),
-        alteration_details: orderDetails.alteration_details[0] || {},
+        alteration_details: orderDetails.alteration_details || {
+          jacketForm: 0,
+          dressLength: 0,
+          pantsLength: 0,
+          shirtSleeve: 0,
+          jacketLength: 0,
+          dressBackForm: 0,
+          pantsCircumference: 0,
+          shirtNeck: 0,
+          jacketSleeve: 0,
+          notes: "",
+        },
         author_id: orderDetails.author_id || "",
         modifier_id: orderDetails.modifier_id || "",
       }));
@@ -238,6 +249,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         ...prev.alteration_details,
         [field]: value,
       },
+      // alter_notes도 동기화 (notes 필드가 변경될 때)
+      ...(field === "notes" ? { alter_notes: value } : {}),
     }));
   };
 
@@ -362,21 +375,14 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       return isNaN(parsed) ? null : parsed;
     };
 
-    console.log("selectedProducts", selectedProducts);
+    // Convert status format from "Order Completed" to "Order_Completed"
+    const convertStatusToApiFormat = (status) => {
+      return status.replace(/ /g, "_");
+    };
 
-    const orderItems = Object.values(selectedProducts)
-      .filter((item) => item.productId)
-      .map((item) => ({
-        product_id: safeParseInt(item.productId),
-        attributes_id:
-          item.attributes && item.attributes.length > 0
-            ? safeParseInt(item.attributes[0].id)
-            : null,
-        quantity: safeParseInt(item.quantity) || 0,
-        price: item.price * (safeParseInt(item.quantity) || 0),
-      }));
-
+    // Convert trade-in currency format (10K -> K10)
     const convertTradeInCurrency = (currency) => {
+      if (!currency) return null;
       const currencyMap = {
         "10K": "K10",
         "14K": "K14",
@@ -386,52 +392,94 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       return currencyMap[currency] || currency;
     };
 
-    const paymentsData = payments.map((payment) => ({
-      payer: payment.payerName || formData.groomName,
-      payment_date: payment.payment_date || new Date().toISOString(),
-      cashAmount: safeParseInt(payment.cashAmount) || null,
-      cashCurrency: payment.cashAmount ? payment.cashCurrency : null,
-      cardAmount: safeParseInt(payment.cardAmount) || null,
-      cardCurrency: payment.cardAmount ? payment.cardCurrency : null,
-      tradeInAmount: payment.tradeInAmount
-        ? safeParseInt(payment.tradeInAmount)
-        : null,
-      tradeInCurrency: payment.tradeInAmount
-        ? convertTradeInCurrency(payment.tradeInCurrency)
-        : null,
-      paymentMethod: payment.paymentMethod.toUpperCase(),
-      notes: payment.notes || "",
-    }));
+    // Prepare order items
+    const orderItems = Object.values(selectedProducts)
+      .filter((item) => item.productId)
+      .map((item) => ({
+        product_id: safeParseInt(item.productId),
+        attributes_id:
+          item.attributes && item.attributes.length > 0
+            ? safeParseInt(item.attributes[0].id)
+            : null,
+        quantity: safeParseInt(item.quantity) || 0,
+        price: (item.price || 0) * (safeParseInt(item.quantity) || 0),
+      }));
 
-    // alteration_details를 배열로 변환
-    const alterationDetailsArray = [
-      {
-        ...formData.alteration_details,
-      },
-    ];
+    // Prepare payments data according to API format
+    const paymentsData = payments.map((payment) => {
+      const basePayment = {
+        payer: payment.payerName || formData.groomName,
+        payment_date: payment.payment_date || new Date().toISOString(),
+        paymentMethod: payment.paymentMethod.toLowerCase(), // Convert to lowercase
+        notes: payment.notes || "",
+      };
 
+      // Only add amount and currency if they exist
+      if (payment.cashAmount && payment.cashAmount > 0) {
+        basePayment.cashAmount = safeParseInt(payment.cashAmount);
+        basePayment.cashCurrency = payment.cashCurrency;
+      }
+
+      if (payment.cardAmount && payment.cardAmount > 0) {
+        basePayment.cardAmount = safeParseInt(payment.cardAmount);
+        basePayment.cardCurrency = payment.cardCurrency;
+      }
+
+      if (payment.tradeInAmount && payment.tradeInAmount > 0) {
+        basePayment.tradeInAmount = safeParseInt(payment.tradeInAmount);
+        basePayment.tradeInCurrency = convertTradeInCurrency(
+          payment.tradeInCurrency
+        );
+      }
+
+      return basePayment;
+    });
+
+    // alteration_details as object, not array
+    const alterationDetails = {
+      jacketSleeve: safeParseInt(formData.alteration_details.jacketSleeve) || 0,
+      jacketLength: safeParseInt(formData.alteration_details.jacketLength) || 0,
+      jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
+      pantsCircumference:
+        safeParseInt(formData.alteration_details.pantsCircumference) || 0,
+      pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
+      shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
+      shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
+      dressBackForm:
+        safeParseInt(formData.alteration_details.dressBackForm) || 0,
+      dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
+      notes: formData.alteration_details.notes || "",
+    };
+
+    // Prepare final data according to API spec
     return {
-      ...formData,
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
       modifier_id: safeParseInt(formData.modifier_id),
       affiliation_id: safeParseInt(formData.affiliation_id),
-      status: formData.status,
+      status: convertStatusToApiFormat(formData.status),
+      groomName: formData.groomName || null,
+      brideName: formData.brideName || null,
+      contact: formData.contact || "",
+      address: formData.address || "",
+      collectionMethod: formData.collectionMethod || "",
+      notes: formData.notes || "",
+      alter_notes: formData.alteration_details.notes || "",
       totalPrice: totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
       orderItems: orderItems,
       payments: paymentsData,
-      alteration_details: alterationDetailsArray, // 배열로 변경된 부분
+      alteration_details: alterationDetails,
     };
   }, [
     formData,
+    event_id,
     selectedProducts,
     payments,
     totalPrice,
     prepaymentTotal,
     balanceTotal,
-    event_id,
   ]);
 
   useEffect(() => {

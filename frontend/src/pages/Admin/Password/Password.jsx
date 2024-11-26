@@ -1,14 +1,17 @@
 import React, { useState } from "react";
 import { Button, Input } from "../../../components";
 import { TabNavigation } from "../../../modules";
-import { useChangePassword, useChangeAdminPassword } from "../../../api/hooks";
+import {
+  useChangeUserPassword,
+  useChangeAdminPassword,
+} from "../../../api/hooks";
 import styles from "./Password.module.css";
 
 export const Password = () => {
   const [userPasswords, setUserPasswords] = useState({ old: "", new: "" });
   const [adminPasswords, setAdminPasswords] = useState({ old: "", new: "" });
 
-  const changePasswordMutation = useChangePassword();
+  const changeUserPasswordMutation = useChangeUserPassword();
   const changeAdminPasswordMutation = useChangeAdminPassword();
 
   const handlePasswordChange = (type, field) => (e) => {
@@ -22,22 +25,17 @@ export const Password = () => {
 
   const handleUserPasswordSubmit = (e) => {
     e.preventDefault();
-    changePasswordMutation.mutate(
+    const userId = localStorage.getItem("userId"); // userId를 로컬 스토리지에서 가져옴
+
+    changeUserPasswordMutation.mutate(
       {
+        userId,
         oldPassword: userPasswords.old,
         newPassword: userPasswords.new,
       },
       {
         onSuccess: () => {
-          alert("직원용 비밀번호가 성공적으로 변경되었습니다.");
           setUserPasswords({ old: "", new: "" });
-        },
-        onError: (error) => {
-          console.error("Password change error:", error);
-          alert(
-            "비밀번호 변경에 실패했습니다. " +
-              (error.response?.data?.detail?.[0]?.msg || "다시 시도해주세요.")
-          );
         },
       }
     );
@@ -52,11 +50,7 @@ export const Password = () => {
       },
       {
         onSuccess: () => {
-          alert("관리자용 비밀번호가 성공적으로 변경되었습니다.");
           setAdminPasswords({ old: "", new: "" });
-        },
-        onError: () => {
-          alert("비밀번호 변경에 실패했습니다. 다시 시도해주세요.");
         },
       }
     );
@@ -95,7 +89,11 @@ export const Password = () => {
                   required
                 />
               </div>
-              <Button type="submit" label="수정" />
+              <Button
+                type="submit"
+                label="수정"
+                disabled={changeUserPasswordMutation.isLoading}
+              />
             </form>
           </section>
           <section className={styles.section}>
@@ -125,7 +123,11 @@ export const Password = () => {
                   required
                 />
               </div>
-              <Button type="submit" label="수정" />
+              <Button
+                type="submit"
+                label="수정"
+                disabled={changeAdminPasswordMutation.isLoading}
+              />
             </form>
           </section>
         </div>

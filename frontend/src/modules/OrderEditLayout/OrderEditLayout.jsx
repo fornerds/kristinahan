@@ -7,8 +7,7 @@ import { ReactComponent as LeftArrow } from "../../asset/icon/left_small.svg";
 import styles from "./OrderEditLayout.module.css";
 import {
   useOrderDetails,
-  useUpdateOrder,
-  useDeleteOrder,
+  useSaveOrder,
   useEventDetails,
 } from "../../api/hooks";
 
@@ -17,15 +16,13 @@ export const OrderEditLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderData, setOrderData] = useState(null);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const printableAreaRef = useRef(null);
 
   const { data: orderDetails, isLoading, error } = useOrderDetails(order_id);
-  const updateOrderMutation = useUpdateOrder();
-  const deleteOrderMutation = useDeleteOrder();
+  const saveOrderMutation = useSaveOrder();
 
   const {
     data: eventResponse,
@@ -46,44 +43,32 @@ export const OrderEditLayout = () => {
 
   const [prepareOrderData, setPrepareOrderData] = useState(() => () => ({}));
 
-  const handleSave = useCallback(
-    async (isTemp = false) => {
-      if (typeof prepareOrderData !== "function") {
-        console.error("prepareOrderData is not a function");
-        setErrorMessage("주문 데이터를 준비하는 중 오류가 발생했습니다.");
+  const handleSave = async (isTemp = false) => {
+    try {
+      const orderDataToSave = prepareOrderData();
+      if (!orderDataToSave) {
+        setErrorMessage("주문서 데이터 준비 중 오류가 발생했습니다.");
         setIsErrorModalOpen(true);
         return;
       }
 
-      const orderData = prepareOrderData();
-      console.log("Submitting order data:", orderData);
+      await saveOrderMutation.mutateAsync({
+        orderData: orderDataToSave,
+        orderId: order_id,
+        isTemp: isTemp,
+      });
 
-      try {
-        await updateOrderMutation.mutateAsync({
-          orderId: parseInt(order_id, 10),
-          orderData: orderData,
-          isTemp: false,
-        });
+      if (!isTemp) {
         setIsConfirmModalOpen(true);
-      } catch (error) {
-        console.error("Failed to update order:", error);
-        let errorMsg = "주문서 수정 중 오류가 발생했습니다.";
-        if (error.response) {
-          if (error.response.status === 422) {
-            errorMsg =
-              "입력값이 올바르지 않습니다. 모든 필수 항목을 확인해주세요.";
-          } else if (error.response.data?.detail) {
-            errorMsg = Array.isArray(error.response.data.detail)
-              ? error.response.data.detail[0]?.msg || errorMsg
-              : error.response.data.detail;
-          }
-        }
-        setErrorMessage(errorMsg);
-        setIsErrorModalOpen(true);
+      } else {
+        navigate(backLink);
       }
-    },
-    [order_id, prepareOrderData, updateOrderMutation]
-  );
+    } catch (error) {
+      console.error("Failed to save order:", error);
+      setErrorMessage("주문서 저장 중 오류가 발생했습니다.");
+      setIsErrorModalOpen(true);
+    }
+  };
 
   const handlePrepareOrderData = useCallback((prepareFunction) => {
     if (typeof prepareFunction === "function") {
@@ -92,17 +77,6 @@ export const OrderEditLayout = () => {
       console.error("Received invalid prepareOrderData:", prepareFunction);
     }
   }, []);
-
-  const handleDelete = async () => {
-    try {
-      await deleteOrderMutation.mutateAsync(order_id);
-      navigate(backLink);
-    } catch (error) {
-      console.error("Failed to delete order:", error);
-      setErrorMessage("주문서 삭제 중 오류가 발생했습니다.");
-      setIsErrorModalOpen(true);
-    }
-  };
 
   const handlePrint = () => {
     const printContent = printableAreaRef.current.innerHTML;
@@ -174,12 +148,6 @@ export const OrderEditLayout = () => {
             onClick={handlePrint}
           />
           <Button
-            label="삭제하기"
-            className={styles.actionButton}
-            variant="danger"
-            onClick={() => setIsDeleteModalOpen(true)}
-          />
-          <Button
             label="수정하기"
             className={styles.actionButton}
             onClick={() => handleSave(false)}
@@ -195,16 +163,6 @@ export const OrderEditLayout = () => {
         onConfirm={() => {
           setIsConfirmModalOpen(false);
         }}
-      />
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="주문서 삭제"
-        message="정말로 이 주문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        confirmLabel="삭제"
-        cancelLabel="취소"
-        onConfirm={handleDelete}
-        onCancel={() => setIsDeleteModalOpen(false)}
       />
       <Modal
         isOpen={isErrorModalOpen}
