@@ -25,6 +25,7 @@ export const AffiliationList = () => {
 
 const AffiliationManagement = () => {
   const { data: affiliations, isLoading, isError } = useAffiliations();
+  console.log("Affiliations data structure:", affiliations);
   const createAffiliationMutation = useCreateAffiliation();
   const updateAffiliationMutation = useUpdateAffiliation();
   const deleteAffiliationMutation = useDeleteAffiliation();
@@ -32,23 +33,44 @@ const AffiliationManagement = () => {
   const handleAddAffiliation = () => {
     const name = prompt("새 소속 이름을 입력하세요:");
     if (name) {
-      createAffiliationMutation.mutate({ name });
+      createAffiliationMutation.mutate(
+        { name },
+        {
+          onSuccess: (data) => {
+            // API 응답으로 반환된 새로운 소속 데이터를 사용할 수 있음
+            console.log("새로운 소속이 생성됨:", data);
+          },
+        }
+      );
     }
   };
 
   const handleUpdateAffiliation = (affiliation) => {
     const newName = prompt("새 이름을 입력하세요:", affiliation.name);
     if (newName && newName !== affiliation.name) {
-      updateAffiliationMutation.mutate({
-        affiliationId: affiliation.id,
-        name: newName,
-      });
+      updateAffiliationMutation.mutate(
+        {
+          affiliationId: affiliation.id,
+          affiliationData: { name: newName },
+        },
+        {
+          onSuccess: (data) => {
+            // 업데이트된 소속 데이터를 사용할 수 있음
+            console.log("소속 정보가 업데이트됨:", data);
+          },
+        }
+      );
     }
   };
 
   const handleDeleteAffiliation = (affiliationId) => {
     if (window.confirm("정말로 이 소속을 삭제하시겠습니까?")) {
-      deleteAffiliationMutation.mutate(affiliationId);
+      deleteAffiliationMutation.mutate(affiliationId, {
+        onSuccess: () => {
+          // 삭제 성공 후의 추가 처리를 할 수 있음
+          console.log("소속이 삭제됨:", affiliationId);
+        },
+      });
     }
   };
 
@@ -67,7 +89,7 @@ const AffiliationManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {affiliations?.data.map((affiliation) => (
+            {affiliations?.map((affiliation) => (
               <tr key={affiliation.id}>
                 <td>{affiliation.name}</td>
                 <td>
@@ -102,3 +124,5 @@ const AffiliationManagement = () => {
     </div>
   );
 };
+
+export default AffiliationList;
