@@ -667,96 +667,81 @@ export const useUpdateForm = () => {
   return useMutation(
     ({ formId, formData }) => api.updateForm(formId, formData),
     {
-      onError: handleApiError,
-      onSuccess: (response, variables) => {
-        queryClient.invalidateQueries("forms");
-        queryClient.invalidateQueries(["form", variables.formId]);
-        alert("주문서 양식이 성공적으로 수정되었습니다.");
-        return response.data;
-      },
       onMutate: async ({ formId, formData }) => {
-        await queryClient.cancelQueries("forms");
+        // 이전 쿼리 취소
+        await queryClient.cancelQueries(["forms"]);
         await queryClient.cancelQueries(["form", formId]);
 
+        // 이전 데이터 스냅샷 저장
         const previousForms = queryClient.getQueryData("forms");
         const previousForm = queryClient.getQueryData(["form", formId]);
 
-        // 양식 목록 업데이트
-        queryClient.setQueryData("forms", (old) =>
-          old
-            ? old.map((form) =>
-                form.id === formId
-                  ? {
-                      ...form,
-                      name: formData.name,
-                      repairs: formData.repairs || form.repairs,
-                      categories: formData.categories || form.categories,
-                    }
-                  : form
-              )
-            : old
-        );
+        // forms 쿼리 데이터가 있는 경우에만 업데이트
+        if (previousForms && Array.isArray(previousForms)) {
+          queryClient.setQueryData("forms", (old) =>
+            old.map((form) =>
+              form.id === formId
+                ? {
+                    ...form,
+                    name: formData.name,
+                    repairs: formData.repairs,
+                    categories: formData.categories,
+                  }
+                : form
+            )
+          );
+        }
 
-        // 양식 상세 정보 업데이트
+        // form 상세 데이터가 있는 경우에만 업데이트
         if (previousForm) {
-          queryClient.setQueryData(["form", formId], {
-            ...previousForm,
+          queryClient.setQueryData(["form", formId], (old) => ({
+            ...old,
             ...formData,
-          });
+          }));
         }
 
         return { previousForms, previousForm };
       },
-      onError: (err, variables, context) => {
-        queryClient.setQueryData("forms", context.previousForms);
-        if (context.previousForm) {
-          queryClient.setQueryData(
-            ["form", variables.formId],
-            context.previousForm
-          );
+
+      onError: (err, { formId }, context) => {
+        // context가 있는 경우에만 롤백 수행
+        if (context) {
+          if (context.previousForms) {
+            queryClient.setQueryData("forms", context.previousForms);
+          }
+          if (context.previousForm) {
+            queryClient.setQueryData(["form", formId], context.previousForm);
+          }
         }
-        handleApiError(err);
+        // 에러 처리
+        console.error("Update form error:", err);
+      },
+
+      onSettled: (_, __, { formId }) => {
+        // 쿼리 무효화
+        queryClient.invalidateQueries("forms");
+        queryClient.invalidateQueries(["form", formId]);
       },
     }
   );
 };
 
-export const useDeleteForm = () => {
-  const queryClient = useQueryClient();
+// Fast API에 없음
+// export const useDeleteForm = () => {
+//   const queryClient = useQueryClient();
 
-  return useMutation((formId) => api.deleteForm(formId), {
-    onError: handleApiError,
-    onSuccess: (_, formId) => {
-      queryClient.invalidateQueries("forms");
-      queryClient.removeQueries(["form", formId]);
-      alert("주문서 양식이 성공적으로 삭제되었습니다.");
-    },
-    onMutate: async (formId) => {
-      await queryClient.cancelQueries("forms");
-      await queryClient.cancelQueries(["form", formId]);
-
-      const previousForms = queryClient.getQueryData("forms");
-      const previousForm = queryClient.getQueryData(["form", formId]);
-
-      // 양식 목록에서 제거
-      queryClient.setQueryData("forms", (old) =>
-        old ? old.filter((form) => form.id !== formId) : old
-      );
-
-      // 양식 상세 정보 제거
-      queryClient.removeQueries(["form", formId]);
-
-      return { previousForms, previousForm };
-    },
-    onError: (err, formId, context) => {
-      queryClient.setQueryData("forms", context.previousForms);
-      if (context.previousForm) {
-        queryClient.setQueryData(["form", formId], context.previousForm);
-      }
-      handleApiError(err);
-    },
-  });
-};
+//   return useMutation((formId) => api.deleteForm(formId), {
+//     onSuccess: () => {
+//       queryClient.invalidateQueries("forms");
+//       alert("주문서 양식이 성공적으로 삭제되었습니다.");
+//     },
+//     onError: (error) => {
+//       console.error("Delete form error:", error);
+//       const errorMessage = error.response?.data?.detail || error.message;
+//       alert(`주문서 양식 삭제에 실패했습니다: ${errorMessage}`);
+//     },
+//   });
+// };
 
 export const useDuplicateForm = () => {
   const queryClient = useQueryClient();

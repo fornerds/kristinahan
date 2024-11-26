@@ -1,152 +1,192 @@
 .adminLayout {
-    display: flex;
+  display: flex;
 }
 
 .adminMainWrap {
-    width: calc(100vw - 300px);
-    box-sizing: border-box;
-    padding: 40px 60px;
-    display: flex;
-    flex-direction: column;
+  width: calc(100vw - 300px);
+  box-sizing: border-box;
+  padding: 40px 60px;
+  display: flex;
+  flex-direction: column;
 }
 
 .adminTitle {
-    font-size: 30px;
-    font-weight: 700;
+  font-size: 30px;
+  font-weight: 700;
 }
 
 .sectionWrap {
-    margin-top: 50px;
-    border-radius: 10px;
-    border: 1px solid #dddddd;
-    padding: 30px;
+  margin-top: 50px;
+  border-radius: 10px;
+  border: 1px solid #dddddd;
+  padding: 30px;
 }
 
 .section {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 40px;
 }
 
 .input {
-    width: 400px;
-    background-color: transparent;
-    border: 1px solid var(--cancel-color);
+  width: 400px;
+  background-color: transparent;
+  border: 1px solid var(--cancel-color);
 }
 
 .managementSection {
-    width: 240px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    box-sizing: border-box;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 .table {
-    width: 240px;
+  width: 240px;
 }
 
-.table tr, .table td, .table th {
-    border: 1px solid #dadde3;
+.table tr,
+.table td,
+.table th {
+  border: 1px solid #dadde3;
 }
 
 .table thead {
-    background-color: #fafafb;
+  background-color: #fafafb;
 }
 
-.table tr th, .table tr td {
-    font-size: 14px;
-    padding: 10px 10px 10px 4px;
+.table tr th,
+.table tr td {
+  font-size: 14px;
+  padding: 10px 10px 10px 4px;
 }
 
-.table tr:nth-child(even) td{
-    background-color: #fafafb;
-    cursor: pointer;
+.table tr:nth-child(even) td {
+  background-color: #fafafb;
+  cursor: pointer;
 }
 
-.table tr:nth-child(odd) td{
-    background-color: white;
-    cursor: pointer;
+.table tr:nth-child(odd) td {
+  background-color: white;
+  cursor: pointer;
 }
 
 .deleteButton {
-    width: 40px;
-    height: 30px;
+  width: 40px;
+  height: 30px;
 }
 
 .addButton {
-    display: flex;
-    justify-content: center;
-    font-size: 14px;
-    background-color: transparent;
-    color: var(--main-color);
+  display: flex;
+  justify-content: center;
+  font-size: 14px;
+  background-color: transparent;
+  color: var(--main-color);
 }
 
 .sectionGroupWrap {
-    margin-top: 22px;
-    display: flex;
-    gap: 30px;
-    flex-wrap: wrap;
+  margin-top: 22px;
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
 }
 
 .sectionGroup {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .sectionVerticalGroup {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .sectionLabel {
-    font-size: 16px;
-    font-weight: 600;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .select {
-    border: 1px solid var(--cancel-color);
-    border-radius: 6px;
-    width: 200px;
-    height: 30px;
-    font-size: 14px;
-    padding: 0 4px;
-    margin-left: 6px;
+  border: 1px solid var(--cancel-color);
+  border-radius: 6px;
+  width: 200px;
+  height: 30px;
+  font-size: 14px;
+  padding: 0 4px;
 }
 
 .spacebetween {
-    margin-top: 20px;
-    display: flex;
-    justify-content: space-between;
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .buttonGroup {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
 }
 
 .cancelLink {
-    width: 100px;
-    height: 40px;
-    background-color: var(--cancel-color);
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 8px;
+  width: 100px;
+  height: 40px;
+  background-color: var(--cancel-color);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
 }
 
 .saveButton {
-    width: 100px;
-    height: 40px;
+  width: 100px;
+  height: 40px;
 }
 
 .deleteButton {
-    width: 100px;
-    height: 40px;
+  width: 100px;
+  height: 40px;
+}
+
+.repairItem {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  max-width: 700px;
+}
+
+.repairContent {
+  flex: 1;
+}
+
+.repairField {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.repairRow {
+  display: flex;
+  gap: 1rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
 }

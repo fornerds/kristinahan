@@ -7,72 +7,89 @@ import styles from "./OrderForm.module.css";
 import {
   useFormDetails,
   useUpdateForm,
-  useDeleteForm,
   useCategories,
 } from "../../../../api/hooks";
 
 export const OrderForm = () => {
   const { orderform_id } = useParams();
   const navigate = useNavigate();
-  const { data: formData, isLoading, isError } = useFormDetails(orderform_id);
-  const { data: allCategoriesData, isLoading: isCategoriesLoading } =
+  const { data: form, isLoading, isError } = useFormDetails(orderform_id);
+  const { data: allCategories, isLoading: isCategoriesLoading } =
     useCategories();
   const updateFormMutation = useUpdateForm();
-  const deleteFormMutation = useDeleteForm();
 
   const [formName, setFormName] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [measurementUnits, setMeasurementUnits] = useState({});
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [repairs, setRepairs] = useState([]);
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
     title: "",
     message: "",
   });
 
-  const form = formData?.data;
-  const allCategories = allCategoriesData?.data;
-
-  console.log(form);
-
-  const measurementUnitMapping = {
-    자켓소매: "jacketSleeve",
-    자켓길이: "jacketLength",
-    자켓폼: "jacketForm",
-    바지둘레: "pantsCircumference",
-    바지길이: "pantsLength",
-    셔츠목: "shirtNeck",
-    셔츠소매: "shirtSleeve",
-    드레스등폼: "dressBackForm",
-    드레스길이: "dressLength",
-  };
-
   useEffect(() => {
     if (form) {
       setFormName(form.name);
-
-      // 카테고리 설정
-      setSelectedCategories(form.categories);
-
-      // 수선 정보 설정
-      const initialMeasurementUnits = Object.entries(
-        measurementUnitMapping
-      ).reduce((acc, [key, value]) => {
-        acc[key] = form[value] ? form[value].toUpperCase() : "CM";
-        return acc;
-      }, {});
-      setMeasurementUnits(initialMeasurementUnits);
+      // 카테고리 데이터 구조 정규화
+      const normalizedCategories = (form.categories || []).map((category) => ({
+        id: Number(category.id),
+        name: category.name,
+      }));
+      setSelectedCategories(normalizedCategories);
+      setRepairs(form.repairs || []);
     }
   }, [form]);
 
+  const addRepair = () => {
+    setRepairs([
+      ...repairs,
+      {
+        information: "",
+        unit: "cm",
+        standards: "",
+        isAlterable: true,
+      },
+    ]);
+  };
+
+  const removeRepair = (index) => {
+    setRepairs(repairs.filter((_, i) => i !== index));
+  };
+
+  const updateRepair = (index, field, value) => {
+    const updatedRepairs = [...repairs];
+    updatedRepairs[index] = {
+      ...updatedRepairs[index],
+      [field]: value,
+    };
+    setRepairs(updatedRepairs);
+  };
+
   const addCategory = () => {
-    if (allCategories && allCategories.length > 0) {
-      const newCategory = allCategories.find(
-        (cat) => !selectedCategories.some((selected) => selected.id === cat.id)
-      );
-      if (newCategory) {
-        setSelectedCategories([...selectedCategories, newCategory]);
-      }
+    if (!allCategories?.length) return;
+
+    const selectedIds = new Set(
+      selectedCategories.map((cat) => Number(cat.id))
+    );
+    const availableCategories = allCategories.filter(
+      (cat) => !selectedIds.has(Number(cat.id))
+    );
+
+    if (availableCategories.length > 0) {
+      const categoryToAdd = availableCategories[0];
+      setSelectedCategories([
+        ...selectedCategories,
+        {
+          id: Number(categoryToAdd.id),
+          name: categoryToAdd.name,
+        },
+      ]);
+    } else {
+      setModalInfo({
+        isOpen: true,
+        title: "알림",
+        message: "추가할 수 있는 카테고리가 없습니다.",
+      });
     }
   };
 
@@ -82,35 +99,45 @@ export const OrderForm = () => {
 
   const handleCategoryChange = (index, newCategoryId) => {
     const newCategory = allCategories.find(
-      (cat) => cat.id === parseInt(newCategoryId)
+      (cat) => cat.id === Number(newCategoryId)
     );
     if (newCategory) {
       const updatedCategories = [...selectedCategories];
-      updatedCategories[index] = newCategory;
+      updatedCategories[index] = {
+        id: Number(newCategory.id),
+        name: newCategory.name,
+      };
       setSelectedCategories(updatedCategories);
     }
   };
 
   const handleSave = async () => {
     try {
-      const updatedForm = {
+      const cleanedRepairs = repairs.map(({ id, indexNumber, ...repair }) => ({
+        ...repair,
+        isAlterable: Boolean(repair.isAlterable),
+        standards: repair.standards || null,
+      }));
+
+      // 단순한 숫자 배열로 변환
+      const categoryIds = selectedCategories.map((category) =>
+        typeof category.id === "string"
+          ? parseInt(category.id, 10)
+          : category.id
+      );
+
+      const formData = {
         name: formName,
-        ...Object.entries(measurementUnits).reduce((acc, [key, value]) => {
-          acc[measurementUnitMapping[key]] = value.toLowerCase(); // API expects lowercase
-          return acc;
-        }, {}),
-        categories: selectedCategories.map((category) => category.id),
+        repairs: cleanedRepairs,
+        categories: categoryIds,
       };
-      // console.log(updatedForm);
+
       await updateFormMutation.mutateAsync({
         formId: orderform_id,
-        formData: updatedForm,
+        formData: formData,
       });
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "주문서 양식이 성공적으로 수정되었습니다.",
-      });
+
+      navigate("/admin/orderform");
     } catch (error) {
       console.error("Update form error:", error);
       setModalInfo({
@@ -118,36 +145,6 @@ export const OrderForm = () => {
         title: "오류",
         message:
           "주문서 양식 수정에 실패했습니다: " +
-          (error.response?.data?.detail || error.message),
-      });
-    }
-  };
-
-  const handleMeasurementUnitChange = (field, value) => {
-    setMeasurementUnits({ ...measurementUnits, [field]: value });
-  };
-
-  const handleDelete = () => {
-    setIsDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    try {
-      await deleteFormMutation.mutateAsync(orderform_id);
-      setIsDeleteModalOpen(false);
-      setModalInfo({
-        isOpen: true,
-        title: "성공",
-        message: "주문서 양식이 성공적으로 삭제되었습니다.",
-      });
-    } catch (error) {
-      console.error("Delete form error:", error);
-      setIsDeleteModalOpen(false);
-      setModalInfo({
-        isOpen: true,
-        title: "오류",
-        message:
-          "주문서 양식 삭제에 실패했습니다: " +
           (error.response?.data?.detail || error.message),
       });
     }
@@ -182,6 +179,88 @@ export const OrderForm = () => {
                   onChange={(e) => setFormName(e.target.value)}
                 />
               </section>
+
+              <section className={styles.section}>
+                <h3 className={styles.sectionTitle}>수선 정보</h3>
+                {repairs.map((repair, index) => (
+                  <div key={index} className={styles.repairItem}>
+                    <div className={styles.repairContent}>
+                      <div className={styles.repairField}>
+                        <Input
+                          type="text"
+                          value={repair.information}
+                          onChange={(e) =>
+                            updateRepair(index, "information", e.target.value)
+                          }
+                          className={styles.input}
+                        />
+                      </div>
+
+                      <div className={styles.repairRow}>
+                        <div className={styles.repairField}>
+                          <label>단위</label>
+                          <select
+                            value={repair.unit}
+                            onChange={(e) =>
+                              updateRepair(index, "unit", e.target.value)
+                            }
+                            className={styles.select}
+                          >
+                            <option value="cm">cm</option>
+                            <option value="inch">inch</option>
+                          </select>
+                        </div>
+
+                        <div className={styles.repairField}>
+                          <label>기준값</label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={repair.standards}
+                            onChange={(e) =>
+                              updateRepair(index, "standards", e.target.value)
+                            }
+                            className={styles.input}
+                          />
+                        </div>
+                      </div>
+
+                      <div className={styles.repairField}>
+                        <label className={styles.checkboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={repair.isAlterable}
+                            onChange={(e) =>
+                              updateRepair(
+                                index,
+                                "isAlterable",
+                                e.target.checked
+                              )
+                            }
+                            className={styles.checkbox}
+                          />
+                          수선 가능 여부
+                        </label>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => removeRepair(index)}
+                      className={styles.deleteButton}
+                      variant="danger"
+                    >
+                      <DeleteIcon />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  onClick={addRepair}
+                  label="+ 수선 정보 추가"
+                  className={styles.addButton}
+                />
+              </section>
+
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>등록된 카테고리</h3>
                 {selectedCategories.length > 0 ? (
@@ -234,34 +313,8 @@ export const OrderForm = () => {
                   className={styles.addButton}
                 />
               </section>
-              <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>수선정보</h3>
-                <div className={styles.sectionGroupWrap}>
-                  {Object.entries(measurementUnits).map(([key, value]) => (
-                    <div key={key} className={styles.sectionVerticalGroup}>
-                      <span className={styles.sectionLabel}>{key}</span>
-                      <select
-                        value={value}
-                        onChange={(e) =>
-                          handleMeasurementUnitChange(key, e.target.value)
-                        }
-                        className={styles.select}
-                      >
-                        <option value="INCH">inch</option>
-                        <option value="CM">cm</option>
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </section>
             </div>
             <div className={styles.spacebetween}>
-              <Button
-                onClick={handleDelete}
-                label="삭제"
-                className={styles.deleteButton}
-                variant="danger"
-              />
               <div className={styles.buttonGroup}>
                 <Link to="/admin/orderform" className={styles.cancelLink}>
                   취소
@@ -276,16 +329,6 @@ export const OrderForm = () => {
           </>
         )}
       </main>
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="주문서 양식 삭제"
-        message="이 주문서 양식을 삭제하시겠습니까?"
-        confirmLabel="삭제"
-        onConfirm={confirmDelete}
-        cancelLabel="취소"
-        onCancel={() => setIsDeleteModalOpen(false)}
-      />
       <Modal
         isOpen={modalInfo.isOpen}
         onClose={closeModal}

@@ -188,7 +188,8 @@ export const createForm = (formData) => api.post("/forms", formData);
 export const updateForm = (formId, formData) =>
   api.put(`/forms/${formId}`, formData);
 
-export const deleteForm = (formId) => api.delete(`/forms/${formId}`);
+// Fast API에 없음
+// export const deleteForm = (formId) => api.delete(`/forms/${formId}`);
 
 export const duplicateForm = (formId) => api.post(`/forms/${formId}/duplicate`);
 

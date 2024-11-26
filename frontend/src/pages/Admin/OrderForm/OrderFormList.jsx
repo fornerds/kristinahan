@@ -22,11 +22,11 @@ export const OrderFormList = () => {
   const handleCopyClick = async (e, formId) => {
     e.stopPropagation(); // 이벤트 버블링 방지
     try {
-      const result = await duplicateFormMutation.mutateAsync(formId);
+      await duplicateFormMutation.mutateAsync(formId);
       setModalInfo({
         isOpen: true,
         title: "성공",
-        message: `'${result?.data.name}' 주문서 양식이 성공적으로 복제되었습니다.`,
+        message: "주문서 양식이 성공적으로 복제되었습니다.",
       });
     } catch (error) {
       setModalInfo({
@@ -75,7 +75,7 @@ export const OrderFormList = () => {
                 </tr>
               </thead>
               <tbody>
-                {forms?.data.map((form) => (
+                {forms?.map((form) => (
                   <tr
                     key={form.id}
                     onClick={() => handleRowClick(form.id)}
