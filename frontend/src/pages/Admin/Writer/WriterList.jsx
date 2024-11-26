@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TabNavigation, Modal } from "../../../modules";
 import { ReactComponent as DeleteIcon } from "../../../asset/icon/delete.svg";
 import { ReactComponent as EditIcon } from "../../../asset/icon/order_form.svg";
@@ -24,7 +24,7 @@ export const WriterList = () => {
 };
 
 const AuthorManagement = () => {
-  const { data: authors, isLoading, isError, error } = useAuthors();
+  const { data: authorsData, isLoading, isError } = useAuthors();
   const createAuthorMutation = useCreateAuthor();
   const updateAuthorMutation = useUpdateAuthor();
   const deleteAuthorMutation = useDeleteAuthor();
@@ -49,35 +49,33 @@ const AuthorManagement = () => {
     setModalInfo({ isOpen: true, type: "delete", author });
   };
 
-  const handleModalConfirm = () => {
-    if (modalInfo.type === "add") {
-      createAuthorMutation.mutate(
-        { name: newAuthorName },
-        {
-          onSuccess: () => alert("작성자가 추가되었습니다."),
-          onError: (error) => alert(`작성자 추가 실패: ${error.message}`),
-        }
-      );
-    } else if (modalInfo.type === "update") {
-      updateAuthorMutation.mutate(
-        { authorId: modalInfo.author.id, name: newAuthorName },
-        {
-          onSuccess: () => alert("작성자 정보가 수정되었습니다."),
-          onError: (error) => alert(`작성자 정보 수정 실패: ${error.message}`),
-        }
-      );
-    } else if (modalInfo.type === "delete") {
-      deleteAuthorMutation.mutate(modalInfo.author.id, {
-        onSuccess: () => alert("작성자가 삭제되었습니다."),
-        onError: (error) => alert(`작성자 삭제 실패: ${error.message}`),
-      });
+  const handleModalConfirm = async () => {
+    try {
+      if (modalInfo.type === "add") {
+        await createAuthorMutation.mutateAsync({ name: newAuthorName });
+      } else if (modalInfo.type === "update") {
+        await updateAuthorMutation.mutateAsync({
+          authorId: modalInfo.author.id,
+          authorData: { name: newAuthorName },
+        });
+      } else if (modalInfo.type === "delete") {
+        await deleteAuthorMutation.mutateAsync(modalInfo.author.id);
+      }
+      handleModalClose();
+    } catch (error) {
+      console.error("Operation failed:", error);
+      // 에러 처리는 hooks 내부에서 이루어지므로 여기서는 로깅만 합니다.
     }
+  };
+
+  const handleModalClose = () => {
     setModalInfo({ isOpen: false, type: "", author: null });
     setNewAuthorName("");
   };
 
   if (isLoading) return <div>로딩 중...</div>;
-  if (isError) return <div>에러가 발생했습니다: {error.message}</div>;
+  if (isError)
+    return <div>에러가 발생했습니다. 페이지를 새로고침해 주세요.</div>;
 
   return (
     <div className={styles.tableWrap}>
@@ -91,7 +89,7 @@ const AuthorManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {authors?.data.map((author) => (
+            {authorsData.map((author) => (
               <tr key={author.id}>
                 <td>{author.name}</td>
                 <td>
@@ -127,8 +125,8 @@ const AuthorManagement = () => {
       </div>
       <Modal
         isOpen={modalInfo.isOpen}
-        onClose={() => setModalInfo({ isOpen: false, type: "", author: null })}
-        onCancel={() => setModalInfo({ isOpen: false, type: "", author: null })}
+        onClose={handleModalClose}
+        onCancel={handleModalClose}
         cancelLabel="취소"
         title={
           modalInfo.type === "add"
