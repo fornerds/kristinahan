@@ -470,29 +470,6 @@ export const useCreateCategory = () => {
       alert("카테고리가 성공적으로 생성되었습니다.");
       return response.data;
     },
-    onMutate: async (newCategory) => {
-      // 낙관적 업데이트를 위한 이전 데이터 백업
-      await queryClient.cancelQueries("categories");
-      const previousCategories = queryClient.getQueryData("categories");
-
-      // 새로운 카테고리를 임시 ID와 함께 추가
-      queryClient.setQueryData("categories", (old) => {
-        const tempId = `temp-${Date.now()}`;
-        const newCategoryWithId = {
-          id: tempId,
-          name: newCategory.name,
-          products: newCategory.products || [],
-          created_at: new Date().toISOString(),
-        };
-        return old ? [...old, newCategoryWithId] : [newCategoryWithId];
-      });
-
-      return { previousCategories };
-    },
-    onError: (err, newCategory, context) => {
-      queryClient.setQueryData("categories", context.previousCategories);
-      handleApiError(err);
-    },
   });
 };
 
@@ -505,56 +482,10 @@ export const useUpdateCategory = () => {
     {
       onError: handleApiError,
       onSuccess: (response, variables) => {
-        // 카테고리 목록과 상세 정보 모두 무효화
+        // 성공 시 관련된 모든 쿼리 무효화
         queryClient.invalidateQueries("categories");
         queryClient.invalidateQueries(["category", variables.categoryId]);
         alert("카테고리가 성공적으로 수정되었습니다.");
-        return response.data;
-      },
-      onMutate: async ({ categoryId, categoryData }) => {
-        // 낙관적 업데이트를 위한 이전 데이터 백업
-        await queryClient.cancelQueries("categories");
-        await queryClient.cancelQueries(["category", categoryId]);
-
-        const previousCategories = queryClient.getQueryData("categories");
-        const previousCategory = queryClient.getQueryData([
-          "category",
-          categoryId,
-        ]);
-
-        // 카테고리 목록 업데이트
-        queryClient.setQueryData("categories", (old) =>
-          old
-            ? old.map((category) =>
-                category.id === categoryId
-                  ? {
-                      ...category,
-                      name: categoryData.name,
-                      products: categoryData.products || category.products,
-                    }
-                  : category
-              )
-            : old
-        );
-
-        // 카테고리 상세 정보 업데이트
-        if (previousCategory) {
-          queryClient.setQueryData(["category", categoryId], {
-            ...previousCategory,
-            ...categoryData,
-          });
-        }
-
-        return { previousCategories, previousCategory };
-      },
-      onError: (err, variables, context) => {
-        // 에러 발생 시 이전 데이터로 롤백
-        queryClient.setQueryData("categories", context.previousCategories);
-        queryClient.setQueryData(
-          ["category", variables.categoryId],
-          context.previousCategory
-        );
-        handleApiError(err);
       },
     }
   );
@@ -569,38 +500,6 @@ export const useDeleteCategory = () => {
       queryClient.invalidateQueries("categories");
       queryClient.removeQueries(["category", categoryId]);
       alert("카테고리가 성공적으로 삭제되었습니다.");
-    },
-    onMutate: async (categoryId) => {
-      // 낙관적 업데이트를 위한 이전 데이터 백업
-      await queryClient.cancelQueries("categories");
-      await queryClient.cancelQueries(["category", categoryId]);
-
-      const previousCategories = queryClient.getQueryData("categories");
-      const previousCategory = queryClient.getQueryData([
-        "category",
-        categoryId,
-      ]);
-
-      // 카테고리 목록에서 제거
-      queryClient.setQueryData("categories", (old) =>
-        old ? old.filter((category) => category.id !== categoryId) : old
-      );
-
-      // 카테고리 상세 정보 제거
-      queryClient.removeQueries(["category", categoryId]);
-
-      return { previousCategories, previousCategory };
-    },
-    onError: (err, categoryId, context) => {
-      // 에러 발생 시 이전 데이터로 롤백
-      queryClient.setQueryData("categories", context.previousCategories);
-      if (context.previousCategory) {
-        queryClient.setQueryData(
-          ["category", categoryId],
-          context.previousCategory
-        );
-      }
-      handleApiError(err);
     },
   });
 };

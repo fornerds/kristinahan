@@ -181,20 +181,18 @@ export const Create = () => {
 
       try {
         const categoryData = {
-          name: categoryName,
+          name: categoryName.trim(),
           products: products.map((product) => ({
-            name: product.name,
-            price: product.price,
-            attributes: product.attributes || [],
+            name: product.name.trim(),
+            price: Number(product.price),
+            attributes: product.attributes.map((attr) => ({
+              value: attr.value.trim(),
+            })),
           })),
         };
 
         await createCategoryMutation.mutateAsync(categoryData);
-        setModalInfo({
-          isOpen: true,
-          title: "성공",
-          message: "카테고리가 성공적으로 생성되었습니다.",
-        });
+        navigate("/admin/product");
       } catch (error) {
         setModalInfo({
           isOpen: true,
@@ -203,7 +201,13 @@ export const Create = () => {
         });
       }
     },
-    [categoryName, products, createCategoryMutation, validateCategoryName]
+    [
+      categoryName,
+      products,
+      createCategoryMutation,
+      validateCategoryName,
+      navigate,
+    ]
   );
 
   const closeModal = useCallback(() => {
@@ -285,7 +289,7 @@ export const Create = () => {
               type="submit"
               className={styles.saveButton}
               label="저장"
-              // disabled={isSubmitDisabled}
+              disabled={isSubmitDisabled}
             />
           </div>
         </form>

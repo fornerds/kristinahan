@@ -14,21 +14,23 @@ export const Product = () => {
   const { category_id } = useParams();
   const navigate = useNavigate();
   const {
-    data: categoryData,
+    data: category,
     isLoading,
     isError,
+    error,
   } = useCategoryDetails(category_id);
   const updateCategoryMutation = useUpdateCategory();
   const deleteCategoryMutation = useDeleteCategory();
+
+  console.log(category);
 
   const [categoryName, setCategoryName] = useState("");
   const [products, setProducts] = useState([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const category = categoryData?.data;
   useEffect(() => {
     if (category) {
-      setCategoryName(category?.name);
+      setCategoryName(category.name);
       setProducts(
         category.products.map((product) => ({
           ...product,
@@ -83,12 +85,12 @@ export const Product = () => {
           attributes: product.attributes.map((attr) => ({ value: attr })),
         })),
       };
-      // console.log(updatedCategory);
+
       await updateCategoryMutation.mutateAsync({
-        categoryId: category_id,
+        categoryId: Number(category_id), // categoryId를 숫자로 변환
         categoryData: updatedCategory,
       });
-      alert("카테고리가 성공적으로 수정되었습니다.");
+      navigate("/admin/product");
     } catch (error) {
       alert("카테고리 수정에 실패했습니다: " + error.message);
     }
@@ -100,8 +102,7 @@ export const Product = () => {
 
   const confirmDelete = async () => {
     try {
-      await deleteCategoryMutation.mutateAsync(category_id);
-      alert("카테고리가 성공적으로 삭제되었습니다.");
+      await deleteCategoryMutation.mutateAsync(Number(category_id)); // categoryId를 숫자로 변환
       navigate("/admin/product");
     } catch (error) {
       alert("카테고리 삭제에 실패했습니다: " + error.message);
@@ -110,7 +111,7 @@ export const Product = () => {
   };
 
   if (isLoading) return <div>로딩 중...</div>;
-  if (isError) return <div>에러가 발생했습니다.</div>;
+  if (isError) return <div>에러가 발생했습니다: {error.message}</div>;
 
   return (
     <div className={styles.adminLayout}>
@@ -120,7 +121,7 @@ export const Product = () => {
         {isLoading ? (
           <div>로딩 중...</div>
         ) : isError ? (
-          <div>에러가 발생했습니다.</div>
+          <div>에러가 발생했습니다: {error.message}</div>
         ) : (
           <>
             <div className={styles.sectionWrap}>

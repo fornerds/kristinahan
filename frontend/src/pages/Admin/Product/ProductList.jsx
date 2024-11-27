@@ -7,6 +7,7 @@ import { useCategories } from "../../../api/hooks";
 
 export const ProductList = () => {
   const navigate = useNavigate();
+  // The updated useCategories hook now returns data directly without .data nesting
   const { data: categories, isLoading, isError, error } = useCategories();
 
   const handleRowClick = (id) => {
@@ -32,24 +33,19 @@ export const ProductList = () => {
           {isLoading ? (
             <div>로딩 중...</div>
           ) : isError ? (
-            error?.response?.status === 404 ||
-            !categories ||
-            categories.length === 0 ? (
-              <div>아직 생성된 카테고리가 없습니다.</div>
-            ) : (
-              <div>에러가 발생했습니다.</div>
-            )
+            <div>에러가 발생했습니다: {error.message}</div>
+          ) : !categories || categories.length === 0 ? (
+            <div>아직 생성된 카테고리가 없습니다.</div>
           ) : (
             <table className={styles.table}>
               <thead>
                 <tr>
                   <th>카테고리</th>
                   <th>상품 정보</th>
-                  {/* <th>생성일</th> */}
                 </tr>
               </thead>
               <tbody>
-                {categories?.data.map((category) => (
+                {categories.map((category) => (
                   <tr
                     key={category.id}
                     onClick={() => handleRowClick(category.id)}
@@ -57,9 +53,6 @@ export const ProductList = () => {
                   >
                     <td>{category.name}</td>
                     <td>{formatProductNames(category.products)}</td>
-                    {/* <td>
-                      {new Date(category.created_at).toLocaleDateString()}
-                    </td> */}
                   </tr>
                 ))}
               </tbody>
