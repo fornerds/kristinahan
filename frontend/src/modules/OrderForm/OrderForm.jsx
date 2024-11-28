@@ -47,7 +47,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const saveOrderMutation = useSaveOrder();
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
-  // console.log(orderData);
+  console.log(orderData);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -247,7 +247,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
   useEffect(() => {
     if (orderData && categories) {
-      // console.log("orderData.payments:", orderData.payments);
+      console.log("Initial payment data:", orderData.payments); // 추가된 로그
 
       // 결제 정보 초기화
       const advancePayment = orderData.payments.find(
@@ -257,7 +257,18 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         (p) => p.paymentMethod === "balance"
       );
 
-      // console.log("Found payments:", { advancePayment, balancePayment });
+      console.log("Found payments:", { advancePayment, balancePayment });
+
+      const calculateInitialConvertedAmount = (payment) => {
+        if (payment?.totalConvertedAmount) {
+          return payment.totalConvertedAmount;
+        }
+        return (
+          (Number(payment?.cashConvertedAmount) || 0) +
+          (Number(payment?.cardConvertedAmount) || 0) +
+          (Number(payment?.tradeInConvertedAmount) || 0)
+        );
+      };
 
       // alteration details 초기화
       const alterationDetailsObj = {
@@ -300,6 +311,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       // payments 초기화
       const initialPayments = [
         {
+          ...advancePayment,
           payment_date:
             advancePayment?.payment_date || new Date().toISOString(),
           paymentMethod: "ADVANCE",
@@ -312,8 +324,14 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           notes: advancePayment?.notes || "",
           payer: advancePayment?.payer || "",
           payerName: advancePayment?.payer || "",
+          cashConvertedAmount: Number(advancePayment?.cashConvertedAmount) || 0,
+          cardConvertedAmount: Number(advancePayment?.cardConvertedAmount) || 0,
+          tradeInConvertedAmount:
+            Number(advancePayment?.tradeInConvertedAmount) || 0,
+          totalConvertedAmount: calculateInitialConvertedAmount(advancePayment),
         },
         {
+          ...balancePayment,
           payment_date:
             balancePayment?.payment_date || new Date().toISOString(),
           paymentMethod: "BALANCE",
@@ -326,14 +344,20 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           notes: balancePayment?.notes || "",
           payer: balancePayment?.payer || "",
           payerName: balancePayment?.payer || "",
+          cashConvertedAmount: Number(balancePayment?.cashConvertedAmount) || 0,
+          cardConvertedAmount: Number(balancePayment?.cardConvertedAmount) || 0,
+          tradeInConvertedAmount:
+            Number(balancePayment?.tradeInConvertedAmount) || 0,
+          totalConvertedAmount: calculateInitialConvertedAmount(balancePayment),
         },
-      ].map((payment) => initializePayments(payment));
-      // console.log("Initialized payments:", initialPayments);
+      ];
+
+      console.log("Setting initial payments:", initialPayments);
 
       // 모든 상태 한번에 업데이트
       setPayments(initialPayments);
-      setPrepaymentTotal(initialPayments[0].totalConvertedAmount);
-      setBalanceTotal(initialPayments[1].totalConvertedAmount);
+      setPrepaymentTotal(calculateInitialConvertedAmount(advancePayment));
+      setBalanceTotal(calculateInitialConvertedAmount(balancePayment));
       setFormData((prev) => ({
         ...prev,
         ...orderData,
@@ -522,10 +546,10 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   );
 
   const handlePaymentChange = useCallback((index, updatedPayment) => {
-    // 각 지급 방법별 원화환산액 계산
-    const cashConverted = Number(updatedPayment.cashAmount || 0);
-    const cardConverted = Number(updatedPayment.cardAmount || 0);
-    const tradeInConverted = Number(updatedPayment.tradeInAmount || 0);
+    // 각 지급 방법별 환산액 계산
+    const cashConverted = updatedPayment.cashConvertedAmount || 0;
+    const cardConverted = updatedPayment.cardConvertedAmount || 0;
+    const tradeInConverted = updatedPayment.tradeInConvertedAmount || 0;
 
     // 원화환산액 총액 계산
     const totalConverted = cashConverted + cardConverted + tradeInConverted;
@@ -536,10 +560,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       newPayments[index] = {
         ...updatedPayment,
         totalConvertedAmount: totalConverted,
-        // 각 지급 방법별 원화환산액 저장
-        cashConvertedAmount: cashConverted,
-        cardConvertedAmount: cardConverted,
-        tradeInConvertedAmount: tradeInConverted,
       };
       return newPayments;
     });

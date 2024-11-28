@@ -71,7 +71,6 @@ export const OrderCreateForm = ({
   const [totalPrice, setTotalPrice] = useState(0);
   const [payments, setPayments] = useState([
     {
-      payer: "",
       payment_date: new Date().toISOString(),
       paymentMethod: "advance",
       cashAmount: 0,
@@ -81,9 +80,13 @@ export const OrderCreateForm = ({
       tradeInAmount: 0,
       tradeInCurrency: "",
       notes: "",
+      totalConvertedAmount: 0,
+      payerName: "",
+      cashConvertedAmount: 0,
+      cardConvertedAmount: 0,
+      tradeInConvertedAmount: 0,
     },
     {
-      payer: "",
       payment_date: new Date().toISOString(),
       paymentMethod: "balance",
       cashAmount: 0,
@@ -93,6 +96,11 @@ export const OrderCreateForm = ({
       tradeInAmount: 0,
       tradeInCurrency: "",
       notes: "",
+      totalConvertedAmount: 0,
+      payerName: "",
+      cashConvertedAmount: 0,
+      cardConvertedAmount: 0,
+      tradeInConvertedAmount: 0,
     },
   ]);
 
@@ -169,44 +177,37 @@ export const OrderCreateForm = ({
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
-  const calculatePaymentAmount = (payment) => {
-    return {
-      cashAmount: Number(payment.cashAmount) || 0,
-      cardAmount: Number(payment.cardAmount) || 0,
-      tradeInAmount: Number(payment.tradeInAmount) || 0,
-    };
-  };
-
   const handlePaymentChange = useCallback(
     (index) => (updatedPayment) => {
+      // 각 지급 방법별 환산액 계산
+      const cashConverted = updatedPayment.cashConvertedAmount || 0;
+      const cardConverted = updatedPayment.cardConvertedAmount || 0;
+      const tradeInConverted = updatedPayment.tradeInConvertedAmount || 0;
+
+      // 원화환산액 총액 계산
+      const totalConverted = cashConverted + cardConverted + tradeInConverted;
+
+      // payments 상태 업데이트
       setPayments((prev) => {
         const newPayments = [...prev];
-        const amounts = calculatePaymentAmount(updatedPayment);
-        const totalAmount = Object.values(amounts).reduce(
-          (sum, amount) => sum + amount,
-          0
-        );
-
         newPayments[index] = {
           ...updatedPayment,
-          payer: updatedPayment.payerName || null,
           paymentMethod: index === 0 ? "advance" : "balance",
           payment_date: updatedPayment.payment_date || new Date().toISOString(),
-          ...amounts,
+          totalConvertedAmount: totalConverted,
+          payer: updatedPayment.payerName || null,
         };
         return newPayments;
       });
 
-      const totalAmount = calculatePaymentAmount(updatedPayment);
-      const sum = Object.values(totalAmount).reduce((acc, val) => acc + val, 0);
-
+      // 선입금/잔금 총액 업데이트
       if (index === 0) {
-        setPrepaymentTotal(sum);
+        setPrepaymentTotal(totalConverted);
       } else {
-        setBalanceTotal(sum);
+        setBalanceTotal(totalConverted);
       }
     },
-    []
+    [formData.groomName]
   );
 
   const handleAlterationChange = (repairId, value, field) => {
@@ -370,30 +371,36 @@ export const OrderCreateForm = ({
 
     const paymentsData = payments.map((payment) => {
       const basePayment = {
-        payer: payment.payer || formData.groomName,
+        payer: payment.payerName,
         payment_date: payment.payment_date,
         paymentMethod: payment.paymentMethod,
         notes: payment.notes || "",
       };
 
-      if (payment.cashAmount > 0) {
-        basePayment.cashAmount = payment.cashAmount;
+      if (payment.cashAmount && payment.cashAmount > 0) {
+        basePayment.cashAmount = safeParseInt(payment.cashAmount);
         basePayment.cashCurrency = payment.cashCurrency;
+        basePayment.cashConvertedAmount = payment.cashConvertedAmount;
       }
-      if (payment.cardAmount > 0) {
-        basePayment.cardAmount = payment.cardAmount;
+
+      if (payment.cardAmount && payment.cardAmount > 0) {
+        basePayment.cardAmount = safeParseInt(payment.cardAmount);
         basePayment.cardCurrency = payment.cardCurrency;
+        basePayment.cardConvertedAmount = payment.cardConvertedAmount;
       }
-      if (payment.tradeInAmount > 0) {
-        basePayment.tradeInAmount = payment.tradeInAmount;
+
+      if (payment.tradeInAmount && payment.tradeInAmount > 0) {
+        basePayment.tradeInAmount = safeParseInt(payment.tradeInAmount);
         basePayment.tradeInCurrency = convertTradeInCurrency(
           payment.tradeInCurrency
         );
+        basePayment.tradeInConvertedAmount = payment.tradeInConvertedAmount;
       }
+
+      basePayment.totalConvertedAmount = payment.totalConvertedAmount;
 
       return basePayment;
     });
-
     const orderData = {
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),

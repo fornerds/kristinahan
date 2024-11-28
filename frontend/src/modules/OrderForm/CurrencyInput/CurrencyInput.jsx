@@ -28,6 +28,7 @@ export const CurrencyInput = React.memo(
       "18K": 1,
       "24K": 1,
     });
+    const [isLoading, setIsLoading] = useState(false);
 
     // 환율 정보 가져오기
     const fetchExchangeRates = async (date) => {
@@ -35,14 +36,26 @@ export const CurrencyInput = React.memo(
         const response = await axios.get(
           `https://kristinahan-db64be049567.herokuapp.com/getExchangeRateInfo?search_date=${date}`
         );
-        const rates = response.data.items.reduce((acc, item) => {
-          if (item.cur_unit === "JPY(100)") {
-            acc["JPY"] = item.deal_bas_r / 100; // 100엔당 가격을 1엔당 가격으로 변환
-          } else {
-            acc[item.cur_unit] = item.deal_bas_r;
+        const rates = response.data.items.reduce(
+          (acc, item) => {
+            const convertToNumber = (value) => {
+              if (typeof value === "string") {
+                return parseFloat(value.replace(/,/g, ""));
+              }
+              return parseFloat(value);
+            };
+
+            if (item.cur_unit === "JPY(100)") {
+              acc["JPY"] = convertToNumber(item.deal_bas_r) / 100; // 100엔당 가격을 1엔당 가격으로 변환
+            } else if (item.cur_unit === "USD") {
+              acc[item.cur_unit] = convertToNumber(item.deal_bas_r);
+            }
+            return acc;
+          },
+          {
+            KRW: 1, // KRW는 항상 1로 고정
           }
-          return acc;
-        }, {});
+        );
         return rates;
       } catch (error) {
         console.error("Failed to fetch exchange rates:", error);
@@ -57,11 +70,19 @@ export const CurrencyInput = React.memo(
           `https://kristinahan-db64be049567.herokuapp.com/getGoldPriceInfo?page_no=1&num_of_rows=1&result_type=json&bas_dt=${date}`
         );
         const goldPrices = response.data.items[0];
+
+        const convertToNumber = (value) => {
+          if (typeof value === "string") {
+            return parseFloat(value.replace(/,/g, ""));
+          }
+          return parseFloat(value);
+        };
+
         return {
-          "10K": goldPrices.gold_10k,
-          "14K": goldPrices.gold_14k,
-          "18K": goldPrices.gold_18k,
-          "24K": goldPrices.gold_24k,
+          "10K": convertToNumber(goldPrices.gold_10k),
+          "14K": convertToNumber(goldPrices.gold_14k),
+          "18K": convertToNumber(goldPrices.gold_18k),
+          "24K": convertToNumber(goldPrices.gold_24k),
         };
       } catch (error) {
         console.error("Failed to fetch gold prices:", error);
@@ -69,45 +90,61 @@ export const CurrencyInput = React.memo(
       }
     };
 
-    // 초기 환율과 금 시세 정보 로드
-    useEffect(() => {
-      const fetchRates = async () => {
+    const fetchRates = async () => {
+      setIsLoading(true);
+      try {
         const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
-        const rates = await fetchExchangeRates(today);
-        const gold = await fetchGoldPrices(today);
+        const [rates, gold] = await Promise.all([
+          fetchExchangeRates(today),
+          fetchGoldPrices(today),
+        ]);
+
         if (rates) setExchangeRates(rates);
         if (gold) setGoldPrices(gold);
-      };
+
+        // 새로운 환율로 현재 값을 다시 계산
+        if (amount && currency) {
+          const newConvertedAmount = calculateConvertedAmount(
+            amount,
+            currency,
+            rates,
+            gold
+          );
+          onChange(amount, currency, newConvertedAmount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch rates:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      if (initialAmount !== undefined || initialCurrency) {
+        const newAmount = initialAmount || 0;
+        const newCurrency = initialCurrency || currencies[0];
+
+        setAmount(newAmount);
+        setCurrency(newCurrency);
+
+        // 환율 정보를 가져온 후 환산액 계산
+        fetchRates().then(() => {
+          const convertedAmount = calculateConvertedAmount(
+            newAmount,
+            newCurrency
+          );
+          onChange(newAmount, newCurrency, convertedAmount);
+        });
+      }
+    }, [initialAmount, initialCurrency]);
+
+    useEffect(() => {
       fetchRates();
-    }, []);
+    }, []); // 컴포넌트 마운트 시 한 번만 실행
 
-    // 외부에서 들어오는 초기값 변경을 감지하여 상태 업데이트
-    useEffect(() => {
-      if (initialAmount !== undefined) {
-        setAmount(initialAmount);
-        const convertedAmount = calculateConvertedAmount(
-          initialAmount,
-          currency
-        );
-        onChange(initialAmount, currency, convertedAmount);
-      }
-    }, [initialAmount]);
-
-    useEffect(() => {
-      if (initialCurrency) {
-        setCurrency(initialCurrency);
-        const convertedAmount = calculateConvertedAmount(
-          amount,
-          initialCurrency
-        );
-        onChange(amount, initialCurrency, convertedAmount);
-      }
-    }, [initialCurrency]);
-
-    // 환산 금액 계산
     const calculateConvertedAmount = useCallback(
       (newAmount, newCurrency) => {
-        if (newAmount === null || !newCurrency) return null;
+        if (newAmount === null || !newCurrency) return 0;
         if (["10K", "14K", "18K", "24K"].includes(newCurrency)) {
           return Math.round(Math.max(0, newAmount) * goldPrices[newCurrency]);
         } else {
@@ -119,44 +156,41 @@ export const CurrencyInput = React.memo(
       [exchangeRates, goldPrices]
     );
 
-    // 통화 변경 핸들러
-    const handleCurrencyChange = useCallback(
-      (e) => {
-        const newCurrency = e.target.value || null;
-        setCurrency(newCurrency);
-        const convertedAmount = calculateConvertedAmount(amount, newCurrency);
-        onChange(amount, newCurrency, convertedAmount);
-      },
-      [amount, onChange, calculateConvertedAmount]
-    );
-
-    // 금액 변경 핸들러
     const handleAmountChange = useCallback(
       (e) => {
-        const newAmount =
-          e.target.value === "" ? null : Math.max(0, Number(e.target.value));
-        setAmount(newAmount);
-        const convertedAmount = calculateConvertedAmount(newAmount, currency);
-        onChange(newAmount, currency, convertedAmount);
+        const inputValue = e.target.value.replace(/[^0-9.]/g, "");
+
+        if (inputValue === "") {
+          setAmount(0);
+          const convertedAmount = calculateConvertedAmount(0, currency);
+          onChange(0, currency, convertedAmount);
+          return;
+        }
+
+        const newAmount = parseFloat(inputValue);
+        if (!isNaN(newAmount)) {
+          setAmount(newAmount);
+          const convertedAmount = calculateConvertedAmount(newAmount, currency);
+          onChange(newAmount, currency, convertedAmount);
+        }
       },
       [currency, onChange, calculateConvertedAmount]
     );
 
-    // 환산 금액 계산 (메모이제이션)
-    const convertedAmount = useMemo(
-      () => calculateConvertedAmount(amount, currency),
-      [amount, currency, calculateConvertedAmount]
-    );
+    const handleCurrencyChange = useCallback(
+      async (e) => {
+        const newCurrency = e.target.value || null;
+        setCurrency(newCurrency);
 
-    // 통화 옵션 메모이제이션
-    const currencyOptions = useMemo(
-      () =>
-        currencies.map((curr) => (
-          <option key={curr} value={curr}>
-            {curr}
-          </option>
-        )),
-      [currencies]
+        // 통화가 변경되면 환율 정보를 새로 가져옴
+        if (newCurrency && newCurrency !== currency) {
+          await fetchRates();
+        }
+
+        const convertedAmount = calculateConvertedAmount(amount, newCurrency);
+        onChange(amount, newCurrency, convertedAmount);
+      },
+      [amount, currency, onChange, calculateConvertedAmount]
     );
 
     return (
@@ -165,28 +199,40 @@ export const CurrencyInput = React.memo(
         <td>
           <select
             name={label}
-            className={styles.currency}
+            className={`${styles.currency} ${isLoading ? styles.loading : ""}`}
             value={currency || ""}
             onChange={handleCurrencyChange}
+            disabled={isLoading}
           >
             {allowNull && <option value="">선택</option>}
-            {currencyOptions}
+            {currencies.map((curr) => (
+              <option key={curr} value={curr}>
+                {curr}
+              </option>
+            ))}
           </select>
         </td>
         <td>
           <input
-            type="number"
-            min="0"
-            className={styles.currencyInput}
+            type="text"
+            className={`${styles.currencyInput} ${
+              isLoading ? styles.loading : ""
+            }`}
             value={amount !== null ? amount : ""}
             onChange={handleAmountChange}
-            key={`${label}-${initialAmount}`}
+            disabled={isLoading}
           />
         </td>
         <td>
-          {convertedAmount !== null && !isNaN(convertedAmount)
-            ? convertedAmount.toLocaleString() + " 원"
-            : "-"}
+          {isLoading ? (
+            <span className={styles.loadingText}>
+              환율 정보를 가져오는 중...
+            </span>
+          ) : (
+            <span>
+              {calculateConvertedAmount(amount, currency).toLocaleString()} 원
+            </span>
+          )}
         </td>
       </tr>
     );

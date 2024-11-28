@@ -1,9 +1,69 @@
 .currencyInput {
-    border: 1px solid var(--cancel-color);
-    border-radius: 6px;
-    width: 180px;
-    height: 30px;
-    font-size: 14px;
-    padding: 0 4px;
-    background-color: white;
+  border: 1px solid var(--cancel-color);
+  border-radius: 6px;
+  width: 180px;
+  height: 30px;
+  font-size: 14px;
+  padding: 0 4px;
+  background-color: white;
+}
+
+.currency,
+.currencyInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  max-width: 200px;
+}
+
+.loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.convertedAmountWrapper {
+  position: relative;
+}
+
+.loadingText {
+  color: #666;
+  font-style: italic;
+}
+
+.updated {
+  animation: highlight 1s ease-out;
+}
+
+.updatedMessage {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background-color: #4caf50;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  animation: fadeOut 3s forwards;
+}
+
+@keyframes highlight {
+  0% {
+    background-color: rgba(76, 175, 80, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
