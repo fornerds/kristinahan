@@ -8,20 +8,16 @@ export const Event = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const { data: response, isLoading, error } = useCurrentEvents();
-
-  // console.log("Loading:", isLoading, "Error:", error, "Response:", response);
+  const { data: events, isLoading, error } = useCurrentEvents();
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
 
-  const events =
-    response?.data && Array.isArray(response.data) ? response.data : [];
-
+  const processedEvents = events || [];
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = events.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = processedEvents.slice(indexOfFirstItem, indexOfLastItem);
 
   // console.log("Current Items:", currentItems);
 

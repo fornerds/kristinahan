@@ -56,7 +56,7 @@ export const OrderList = () => {
 
   const authors = useMemo(
     () =>
-      authorsData?.data.reduce(
+      authorsData?.reduce(
         (acc, author) => ({ ...acc, [author.id]: author.name }),
         {}
       ) || {},
@@ -65,7 +65,7 @@ export const OrderList = () => {
 
   const affiliations = useMemo(
     () =>
-      affiliationsData?.data.reduce(
+      affiliationsData?.reduce(
         (acc, affiliation) => ({ ...acc, [affiliation.id]: affiliation.name }),
         {}
       ) || {},
@@ -78,9 +78,9 @@ export const OrderList = () => {
     }
   }, [event_id, filters, currentPage, refetch]);
 
-  const orders = ordersData?.data?.orders || [];
-  const total = ordersData?.data?.total || 0;
-  const eventData = eventResponse?.data;
+  const orders = ordersData?.orders || [];
+  const total = ordersData?.total || 0;
+  const eventData = eventResponse;
 
   const downloadOrdersMutation = useDownloadOrders();
 
@@ -88,11 +88,11 @@ export const OrderList = () => {
     const downloadParams = {
       ...filters,
       event_id: event_id,
-      limit: ordersData?.data?.total || 0,
+      limit: ordersData?.total || 0,
       offset: 0,
     };
     downloadOrdersMutation.mutate(downloadParams);
-  }, [downloadOrdersMutation, filters, event_id, ordersData?.data?.total]);
+  }, [downloadOrdersMutation, filters, event_id, ordersData?.total]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
