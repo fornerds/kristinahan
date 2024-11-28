@@ -28,15 +28,18 @@ export const OrderCreationLayout = () => {
   const handleConfirm = () => {
     setIsSaveModalOpen(false);
     setIsCreateModalOpen(false);
+
+    // 생성 완료 모달을 닫을 때 목록 페이지로 이동
+    if (isCreateModalOpen) {
+      navigate(backLink);
+    }
   };
 
   const {
-    data: eventResponse,
+    data: eventData,
     isLoading: eventLoading,
     error: eventError,
   } = useEventDetails(event_id);
-
-  const eventData = eventResponse?.data;
 
   return (
     <div className={styles.orderTableBackground}>
@@ -55,6 +58,7 @@ export const OrderCreationLayout = () => {
         </div>
         <OrderCreateForm
           event_id={event_id}
+          eventName={eventData?.name}
           onSave={handleSave}
           onComplete={handleComplete}
         />
@@ -70,8 +74,8 @@ export const OrderCreationLayout = () => {
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title={"작성완료 알림"}
-        message={"주문서 작성에 성공하였습니다."}
+        title="작성완료 알림"
+        message="주문서 작성에 성공하였습니다."
         confirmLabel="확인"
         onConfirm={handleConfirm}
       />

@@ -16,30 +16,20 @@ export const OrderEditLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [orderData, setOrderData] = useState(null);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const printableAreaRef = useRef(null);
 
-  const { data: orderDetails, isLoading, error } = useOrderDetails(order_id);
+  // API hooks
+  const { data: orderData, isLoading: isLoadingOrder } =
+    useOrderDetails(order_id);
+
+  const { data: event, isLoading: isLoadingEvent } = useEventDetails(event_id);
+
   const saveOrderMutation = useSaveOrder();
 
-  const {
-    data: eventResponse,
-    isLoading: eventLoading,
-    error: eventError,
-  } = useEventDetails(event_id);
-
-  const eventData = eventResponse?.data;
   const isAdminOrderCreate = location.pathname.startsWith("/admin/order");
   const backLink = isAdminOrderCreate ? "/admin/order" : `/event/${event_id}`;
-
-  useEffect(() => {
-    if (orderDetails) {
-      setOrderData(orderDetails?.data);
-      console.log(orderDetails?.data);
-    }
-  }, [orderDetails]);
 
   const [prepareOrderData, setPrepareOrderData] = useState(() => () => ({}));
 
@@ -52,20 +42,24 @@ export const OrderEditLayout = () => {
         return;
       }
 
-      await saveOrderMutation.mutateAsync({
+      const result = await saveOrderMutation.mutateAsync({
         orderData: orderDataToSave,
         orderId: order_id,
         isTemp: isTemp,
       });
 
       if (!isTemp) {
-        setIsConfirmModalOpen(true);
+        if (result.data?.order_id) {
+          setIsConfirmModalOpen(true);
+        }
       } else {
         navigate(backLink);
       }
     } catch (error) {
       console.error("Failed to save order:", error);
-      setErrorMessage("주문서 저장 중 오류가 발생했습니다.");
+      setErrorMessage(
+        error.response?.data?.message || "주문서 저장 중 오류가 발생했습니다."
+      );
       setIsErrorModalOpen(true);
     }
   };
@@ -112,8 +106,9 @@ export const OrderEditLayout = () => {
     document.body.innerHTML = originalContent;
   };
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error loading order details: {error.message}</div>;
+  if (isLoadingOrder || isLoadingEvent || saveOrderMutation.isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className={styles.orderTableBackground}>
@@ -123,11 +118,7 @@ export const OrderEditLayout = () => {
             <LeftArrow />
           </Link>
           <h2 className={styles.tableTitle}>
-            {eventLoading
-              ? "Loading..."
-              : eventError
-              ? "이벤트 정보를 불러오는데 실패했습니다."
-              : `[${eventData?.name}] 주문서 수정`}
+            {event?.data ? `[${event.data.name}] 주문서 수정` : "주문서 수정"}
           </h2>
         </div>
         <div ref={printableAreaRef}>
@@ -135,7 +126,6 @@ export const OrderEditLayout = () => {
             <OrderForm
               event_id={event_id}
               orderId={order_id}
-              initialData={orderData}
               onSave={handlePrepareOrderData}
             />
           )}
@@ -156,12 +146,16 @@ export const OrderEditLayout = () => {
       </div>
       <Modal
         isOpen={isConfirmModalOpen}
-        onClose={() => setIsConfirmModalOpen(false)}
+        onClose={() => {
+          setIsConfirmModalOpen(false);
+          navigate(backLink);
+        }}
         title="수정완료 알림"
         message="주문서 내용을 성공적으로 수정하였습니다."
         confirmLabel="확인"
         onConfirm={() => {
           setIsConfirmModalOpen(false);
+          navigate(backLink);
         }}
       />
       <Modal

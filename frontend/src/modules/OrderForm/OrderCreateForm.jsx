@@ -13,18 +13,22 @@ import {
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
-  "Order Completed": "주문완료",
-  "Packaging Completed": "포장완료",
-  "Repair Received": "수선접수",
-  "Repair Completed": "수선완료",
-  "In delivery": "배송중",
-  "Delivery completed": "배송완료",
-  "Receipt completed": "수령완료",
+  Order_Completed: "주문완료",
+  Packaging_Completed: "포장완료",
+  Repair_Received: "수선접수",
+  Repair_Completed: "수선완료",
+  In_delivery: "배송중",
+  Delivery_completed: "배송완료",
+  Receipt_completed: "수령완료",
   Accommodation: "숙소",
 };
 
-const convertStatusFromApiFormat = (status) => {
-  return status.replace(/_/g, " ");
+const chunk = (array, size) => {
+  const chunked = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunked.push(array.slice(i, i + size));
+  }
+  return chunked;
 };
 
 export const OrderCreateForm = ({
@@ -38,6 +42,7 @@ export const OrderCreateForm = ({
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: null,
+    modifier_id: null,
     affiliation_id: null,
     groomName: "",
     brideName: "",
@@ -45,43 +50,30 @@ export const OrderCreateForm = ({
     address: "",
     collectionMethod: "",
     notes: "",
+    alter_notes: "",
     totalPrice: 0,
     advancePayment: 0,
     balancePayment: 0,
     isTemporary: false,
-    status: "Order Completed",
+    status: "Order_Completed",
     orderItems: [],
-    payments: [],
-    alteration_details: {
-      jacketSleeve: 0,
-      jacketLength: 0,
-      jacketForm: 0,
-      pantsCircumference: 0,
-      pantsLength: 0,
-      shirtNeck: 0,
-      shirtSleeve: 0,
-      dressBackForm: 0,
-      dressLength: 0,
-      notes: "",
-    },
+    alteration_details: [],
   });
 
-  const eventData = event?.data;
-
+  const [selectedProducts, setSelectedProducts] = useState({});
+  const [groupedProducts, setGroupedProducts] = useState({});
   const [customerName, setCustomerName] = useState("");
   const [payerName, setPayerName] = useState("");
-  const [isPayerSameAsCustomer, setIsPayerSameAsCustomer] = useState(false);
   const [affiliationError, setAffiliationError] = useState("");
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
   const [balanceTotal, setBalanceTotal] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
-  const [selectedProducts, setSelectedProducts] = useState({});
-  const [groupedProducts, setGroupedProducts] = useState({});
   const [payments, setPayments] = useState([
     {
-      payment_date: null,
-      paymentMethod: "ADVANCE",
+      payer: "",
+      payment_date: new Date().toISOString(),
+      paymentMethod: "advance",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
@@ -91,8 +83,9 @@ export const OrderCreateForm = ({
       notes: "",
     },
     {
-      payment_date: null,
-      paymentMethod: "BALANCE",
+      payer: "",
+      payment_date: new Date().toISOString(),
+      paymentMethod: "balance",
       cashAmount: 0,
       cashCurrency: "KRW",
       cardAmount: 0,
@@ -104,36 +97,20 @@ export const OrderCreateForm = ({
   ]);
 
   // API hooks
-  const saveOrderMutation = useSaveOrder();
-  const {
-    data: orderDetails,
-    isLoading: isLoadingOrderDetails,
-    error: orderDetailsError,
-  } = useOrderDetails(orderId, { enabled: isEdit });
+  const { mutateAsync: saveOrder } = useSaveOrder();
   const { data: categories, isLoading: isCategoriesLoading } = useCategories();
   const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
   const { data: affiliations, isLoading: isLoadingAffiliations } =
     useAffiliations();
 
-  useEffect(() => {
-    if (isEdit && orderDetails) {
-      setFormData(orderDetails);
-      setCustomerName(orderDetails.groomName);
-      setPayerName(orderDetails.payments[0]?.payerName || "");
-      setIsPayerSameAsCustomer(
-        orderDetails.groomName === orderDetails.payments[0]?.payerName
-      );
-      setPrepaymentTotal(orderDetails.advancePayment);
-      setBalanceTotal(orderDetails.balancePayment);
-      setTotalPrice(orderDetails.totalPrice);
-    }
-  }, [isEdit, orderDetails]);
+  console.log("event", JSON.stringify(event));
+  console.log("categories", categories);
 
   useEffect(() => {
-    if (event?.data && categories && !isEdit) {
+    if (event && categories && !isEdit) {
       const newGroupedProducts = {};
-      event.data.form.categories.forEach((eventCategory) => {
-        const category = categories.data.find((c) => c.id === eventCategory.id);
+      event.form.categories.forEach((eventCategory) => {
+        const category = categories.find((c) => c.id === eventCategory.id);
         if (category) {
           newGroupedProducts[category.id] = category.products;
         }
@@ -142,20 +119,12 @@ export const OrderCreateForm = ({
     }
   }, [event, categories, isEdit]);
 
-  useEffect(() => {
-    if (isPayerSameAsCustomer) {
-      setPayerName(customerName);
-    }
-  }, [isPayerSameAsCustomer, customerName]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleStatusChange = (e) => {
-    const { value } = e.target;
-    setFormData((prev) => ({ ...prev, status: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value ? parseInt(value, 10) : null,
+    }));
   };
 
   const handleContactChange = (e) => {
@@ -200,44 +169,94 @@ export const OrderCreateForm = ({
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
+  const calculatePaymentAmount = (payment) => {
+    return {
+      cashAmount: Number(payment.cashAmount) || 0,
+      cardAmount: Number(payment.cardAmount) || 0,
+      tradeInAmount: Number(payment.tradeInAmount) || 0,
+    };
+  };
+
   const handlePaymentChange = useCallback(
     (index) => (updatedPayment) => {
       setPayments((prev) => {
         const newPayments = [...prev];
-        newPayments[index] = updatedPayment;
+        const amounts = calculatePaymentAmount(updatedPayment);
+        const totalAmount = Object.values(amounts).reduce(
+          (sum, amount) => sum + amount,
+          0
+        );
+
+        newPayments[index] = {
+          ...updatedPayment,
+          payer: updatedPayment.payerName || null,
+          paymentMethod: index === 0 ? "advance" : "balance",
+          payment_date: updatedPayment.payment_date || new Date().toISOString(),
+          ...amounts,
+        };
         return newPayments;
       });
 
-      if (updatedPayment.paymentMethod === "ADVANCE") {
-        setPrepaymentTotal(updatedPayment.totalConvertedAmount || 0);
-      } else if (updatedPayment.paymentMethod === "BALANCE") {
-        setBalanceTotal(updatedPayment.totalConvertedAmount || 0);
+      const totalAmount = calculatePaymentAmount(updatedPayment);
+      const sum = Object.values(totalAmount).reduce((acc, val) => acc + val, 0);
+
+      if (index === 0) {
+        setPrepaymentTotal(sum);
+      } else {
+        setBalanceTotal(sum);
       }
     },
     []
   );
 
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      advancePayment: prepaymentTotal,
-      balancePayment: balanceTotal,
-    }));
-  }, [prepaymentTotal, balanceTotal]);
+  const handleAlterationChange = (repairId, value, field) => {
+    const figure = parseFloat(value);
+    if (isNaN(figure)) return;
 
-  const handleAlterationChange = (field, value) => {
+    setFormData((prev) => {
+      const newAlterationDetails = [...prev.alteration_details];
+      const existingIndex = newAlterationDetails.findIndex(
+        (detail) => detail.form_repair_id === repairId
+      );
+
+      if (existingIndex !== -1) {
+        if (figure === 0 && field === "figure") {
+          // figure가 0이면 해당 항목 제거
+          newAlterationDetails.splice(existingIndex, 1);
+        } else {
+          // 기존 항목 업데이트
+          newAlterationDetails[existingIndex] = {
+            ...newAlterationDetails[existingIndex],
+            [field]: figure,
+          };
+        }
+      } else if (figure !== 0 || field === "alterationFigure") {
+        // 새로운 항목 추가
+        newAlterationDetails.push({
+          form_repair_id: repairId,
+          figure: field === "figure" ? figure : 0,
+          alterationFigure: field === "alterationFigure" ? figure : 0,
+        });
+      }
+
+      return {
+        ...prev,
+        alteration_details: newAlterationDetails,
+      };
+    });
+  };
+
+  const handleAlterationNotes = (value) => {
     setFormData((prev) => ({
       ...prev,
-      alteration_details: {
-        ...prev.alteration_details,
-        [field]: value,
-      },
+      alter_notes: value,
     }));
   };
 
   const handleGroomNameChange = useCallback((e) => {
     const newGroomName = e.target.value;
     setFormData((prev) => ({ ...prev, groomName: newGroomName }));
+    setCustomerName(newGroomName);
   }, []);
 
   const handleBrideNameChange = useCallback((e) => {
@@ -263,14 +282,15 @@ export const OrderCreateForm = ({
           );
 
           if (selectedProduct) {
-            newState[categoryId].price = selectedProduct.price;
-            newState[categoryId].quantity = 1;
-            newState[categoryId].attributes = selectedProduct.attributes.map(
-              (attr) => ({
-                id: attr.attribute_id,
-                value: "",
-              })
-            );
+            newState[categoryId] = {
+              productId: selectedProduct.id,
+              price: selectedProduct.price,
+              quantity: 1,
+              attributes: selectedProduct.attributes.map((attr) => ({
+                id: attr.id,
+                value: attr.value,
+              })),
+            };
           } else {
             newState[categoryId].price = 0;
             newState[categoryId].quantity = 1;
@@ -285,32 +305,6 @@ export const OrderCreateForm = ({
   );
 
   useEffect(() => {
-    const calculateTotal = (payment) => {
-      const cash = Number(payment.cashConvertedAmount) || 0;
-      const card = Number(payment.cardConvertedAmount) || 0;
-      const tradeIn = Number(payment.tradeInConvertedAmount) || 0;
-      return cash + card + tradeIn;
-    };
-
-    const advance =
-      payments.find((p) => p.paymentMethod === "advance") || payments[0];
-    const balance =
-      payments.find((p) => p.paymentMethod === "balance") || payments[1];
-
-    const advanceTotal = calculateTotal(advance);
-    const balanceTotal = calculateTotal(balance);
-
-    setFormData((prev) => ({
-      ...prev,
-      advancePayment: advanceTotal,
-      balancePayment: balanceTotal,
-    }));
-
-    setPrepaymentTotal(advanceTotal);
-    setBalanceTotal(balanceTotal);
-  }, [payments]);
-
-  useEffect(() => {
     const newTotalPrice = Object.values(selectedProducts).reduce(
       (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
       0
@@ -318,7 +312,9 @@ export const OrderCreateForm = ({
     setTotalPrice(newTotalPrice);
     setFormData((prev) => ({
       ...prev,
-      totalPrice: newTotalPrice - prepaymentTotal - balanceTotal,
+      totalPrice: newTotalPrice,
+      advancePayment: prepaymentTotal,
+      balancePayment: balanceTotal,
     }));
   }, [selectedProducts, prepaymentTotal, balanceTotal]);
 
@@ -332,26 +328,35 @@ export const OrderCreateForm = ({
       return isNaN(parsed) ? null : parsed;
     };
 
+    const validateAlterationDetails = (details) => {
+      return details.every(
+        (detail) =>
+          detail.form_repair_id &&
+          typeof detail.figure === "number" &&
+          typeof detail.alterationFigure === "number"
+      );
+    };
+
+    // handleSubmit 함수 내부에서 사용
+    if (
+      formData.alteration_details.length > 0 &&
+      !validateAlterationDetails(formData.alteration_details)
+    ) {
+      alert("수선 정보를 올바르게 입력해주세요.");
+      return;
+    }
+
     const orderItems = Object.entries(selectedProducts)
       .map(([categoryId, item]) => {
-        const product = groupedProducts[categoryId]?.find(
-          (p) => p.id === safeParseInt(item.productId)
-        );
-        const price = product ? product.price : 0;
-        const quantity = safeParseInt(item.quantity) || 0;
+        if (!item.productId) return null;
         return {
           product_id: safeParseInt(item.productId),
           attributes_id: item.attributes[0]?.id || null,
-          quantity: quantity,
-          price: price * quantity,
+          quantity: safeParseInt(item.quantity) || 0,
+          price: (item.price || 0) * (item.quantity || 0),
         };
       })
-      .filter((item) => item.product_id !== null);
-
-    const totalItemsPrice = orderItems.reduce(
-      (sum, item) => sum + item.price,
-      0
-    );
+      .filter(Boolean);
 
     const convertTradeInCurrency = (currency) => {
       const currencyMap = {
@@ -363,65 +368,57 @@ export const OrderCreateForm = ({
       return currencyMap[currency] || currency;
     };
 
-    const paymentsData = payments.map((payment) => ({
-      payer: payment.payerName || customerName,
-      payment_date: payment.payment_date || new Date().toISOString(),
-      cashAmount: Number(payment.cashAmount) || null,
-      cashCurrency: payment.cashAmount ? payment.cashCurrency : null,
-      cardAmount: Number(payment.cardAmount) || null,
-      cardCurrency: payment.cardAmount ? payment.cardCurrency : null,
-      tradeInAmount: Number(payment.tradeInAmount) || null,
-      tradeInCurrency: payment.tradeInAmount
-        ? convertTradeInCurrency(payment.tradeInCurrency)
-        : null,
-      paymentMethod: payment.paymentMethod,
-      notes: payment.notes || "",
-    }));
+    const paymentsData = payments.map((payment) => {
+      const basePayment = {
+        payer: payment.payer || formData.groomName,
+        payment_date: payment.payment_date,
+        paymentMethod: payment.paymentMethod,
+        notes: payment.notes || "",
+      };
 
-    const alterationDetailsArray = [
-      {
-        form_repair_id: event?.data?.form?.id || null,
-        jacketSleeve:
-          safeParseInt(formData.alteration_details.jacketSleeve) || 0,
-        jacketLength:
-          safeParseInt(formData.alteration_details.jacketLength) || 0,
-        jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
-        pantsCircumference:
-          safeParseInt(formData.alteration_details.pantsCircumference) || 0,
-        pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
-        shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
-        shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
-        dressBackForm:
-          safeParseInt(formData.alteration_details.dressBackForm) || 0,
-        dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
-        notes: formData.alteration_details.notes || "",
-      },
-    ];
+      if (payment.cashAmount > 0) {
+        basePayment.cashAmount = payment.cashAmount;
+        basePayment.cashCurrency = payment.cashCurrency;
+      }
+      if (payment.cardAmount > 0) {
+        basePayment.cardAmount = payment.cardAmount;
+        basePayment.cardCurrency = payment.cardCurrency;
+      }
+      if (payment.tradeInAmount > 0) {
+        basePayment.tradeInAmount = payment.tradeInAmount;
+        basePayment.tradeInCurrency = convertTradeInCurrency(
+          payment.tradeInCurrency
+        );
+      }
+
+      return basePayment;
+    });
 
     const orderData = {
-      ...formData,
-      status: orderDetails
-        ? convertStatusFromApiFormat(orderDetails.status)
-        : "Order Completed",
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
       modifier_id: null,
       affiliation_id: safeParseInt(formData.affiliation_id),
-      totalPrice: totalItemsPrice,
+      status: "Order_Completed",
+      groomName: formData.groomName,
+      brideName: formData.brideName,
+      contact: formData.contact,
+      address: formData.address,
+      collectionMethod: formData.collectionMethod,
+      notes: formData.notes,
+      alter_notes: formData.alter_notes,
+      totalPrice: totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
-      orderItems: orderItems,
+      orderItems,
       payments: paymentsData,
-      alteration_details: alterationDetailsArray,
-      alter_notes: formData.alteration_details.notes || "",
+      alteration_details: formData.alteration_details,
     };
 
     try {
-      // 새로운 API 구조에 맞게 수정
-      await saveOrderMutation.mutateAsync({
+      await saveOrder({
         orderData,
-        orderId: isEdit ? orderId : null,
-        isTemp: isTemp,
+        isTemp,
       });
 
       if (isTemp) {
@@ -438,20 +435,19 @@ export const OrderCreateForm = ({
   };
 
   if (
-    isLoadingOrderDetails ||
     isLoadingAuthors ||
     isLoadingAffiliations ||
-    isEventLoading
-  )
+    isEventLoading ||
+    isCategoriesLoading
+  ) {
     return <div>Loading...</div>;
-  if (orderDetailsError)
-    return <div>Error loading order details: {orderDetailsError.message}</div>;
+  }
 
   return (
     <>
+      {/* 주문정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>주문정보</h3>
-
         <div className={styles.sectionValueWrap}>
           <h4 className={styles.sectionLabel}>주문번호</h4>
           <p className={styles.sectionValue}>{formData.id || "새 주문"}</p>
@@ -459,74 +455,33 @@ export const OrderCreateForm = ({
 
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionGroup}>
-            <h4 className={styles.sectionLabel}>
-              {isEdit ? "수정자" : "작성자"}
-            </h4>
+            <h4 className={styles.sectionLabel}>작성자</h4>
             <select
               name="author_id"
               id={styles.writer}
               onChange={handleInputChange}
-              value={formData.author_id}
+              value={formData.author_id || ""}
             >
               <option value="">작성자 선택</option>
-              {authors?.data &&
-                authors?.data.map((author) => (
-                  <option key={author.id} value={author.id}>
-                    {author.name}
-                  </option>
-                ))}
+              {authors?.map((author) => (
+                <option key={author.id} value={author.id}>
+                  {author.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className={styles.sectionGroup}>
-            <h4 className={styles.sectionLabel}>
-              {isEdit ? "수정일자" : "작성일자"}
-            </h4>
+            <h4 className={styles.sectionLabel}>작성일자</h4>
             <p className={styles.sectionValue}>
               {new Date().toLocaleDateString("ko-KR")}
             </p>
           </div>
-          {isEdit && (
-            <>
-              <div className={styles.sectionGroup}>
-                <h4 className={styles.sectionLabel}>작성자</h4>
-                <p className={styles.sectionValue}>{orderDetails.author_id}</p>
-              </div>
-              <div className={styles.sectionGroup}>
-                <h4 className={styles.sectionLabel}>작성일자</h4>
-                <p className={styles.sectionValue}>
-                  {new Date(orderDetails.created_at).toLocaleDateString(
-                    "ko-KR"
-                  )}
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <h4 className={styles.sectionLabel}>주문상태</h4>
-
-          <form className={`${styles.sectionGroup} ${styles.statusWrap}`}>
-            {Object.entries(ORDER_STATUS_MAP).map(([value, label]) => (
-              <div key={value} className={styles.statusLable}>
-                <input
-                  type="radio"
-                  name="status"
-                  id={value}
-                  value={value}
-                  checked={formData.status === value}
-                  onChange={handleStatusChange}
-                />
-                <label htmlFor={value}>{label}</label>
-              </div>
-            ))}
-          </form>
         </div>
       </section>
 
+      {/* 주문자정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>주문자정보</h3>
-
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>신랑</h4>
@@ -556,7 +511,6 @@ export const OrderCreateForm = ({
             <Input
               type="tel"
               className={styles.textInput}
-              name="contact"
               value={formData.contact}
               onChange={handleContactChange}
             />
@@ -566,16 +520,15 @@ export const OrderCreateForm = ({
             <select
               name="affiliation_id"
               id={styles.relation}
-              value={formData.affiliation_id}
+              value={formData.affiliation_id || ""}
               onChange={handleAffiliationChange}
             >
               <option value="">소속 선택</option>
-              {affiliations?.data &&
-                affiliations?.data.map((affiliation) => (
-                  <option key={affiliation.id} value={affiliation.id}>
-                    {affiliation.name}
-                  </option>
-                ))}
+              {affiliations?.map((affiliation) => (
+                <option key={affiliation.id} value={affiliation.id}>
+                  {affiliation.name}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -586,16 +539,13 @@ export const OrderCreateForm = ({
             <Input
               type="text"
               className={styles.addressInput}
-              name="address"
               value={formData.address}
               onChange={handleAddressChange}
             />
           </div>
-
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>수령방법</h4>
             <select
-              name="collectionMethod"
               id={styles.takeout}
               value={formData.collectionMethod}
               onChange={handleCollectionMethodChange}
@@ -612,16 +562,15 @@ export const OrderCreateForm = ({
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>기타사항</h4>
             <textarea
-              name="notes"
-              id="optionalMessage"
               className={styles.optionalMessage}
               value={formData.notes}
               onChange={handleNotesChange}
-            ></textarea>
+            />
           </div>
         </div>
       </section>
 
+      {/* 상품정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>상품정보</h3>
         <table className={styles.table}>
@@ -635,7 +584,7 @@ export const OrderCreateForm = ({
             </tr>
           </thead>
           <tbody>
-            {event?.data?.form.categories.map((category) => (
+            {event?.form.categories.map((category) => (
               <tr key={category.id}>
                 <td>{category.name}</td>
                 <td>
@@ -661,21 +610,26 @@ export const OrderCreateForm = ({
                   {selectedProducts[category.id]?.productId && (
                     <select
                       value={
-                        selectedProducts[category.id]?.attributes?.[0]?.value ||
-                        ""
+                        selectedProducts[category.id]?.attributes?.[0]?.id || ""
                       }
                       onChange={(e) =>
                         handleProductChange(category.id, "attributes", [
                           {
-                            id: groupedProducts[category.id]?.find(
-                              (p) =>
-                                p.id ===
-                                parseInt(
-                                  selectedProducts[category.id].productId,
-                                  10
+                            id: parseInt(e.target.value, 10),
+                            value:
+                              groupedProducts[category.id]
+                                ?.find(
+                                  (p) =>
+                                    p.id ===
+                                    parseInt(
+                                      selectedProducts[category.id].productId,
+                                      10
+                                    )
                                 )
-                            )?.attributes?.[0]?.attribute_id,
-                            value: e.target.value,
+                                ?.attributes?.find(
+                                  (attr) =>
+                                    attr.id === parseInt(e.target.value, 10)
+                                )?.value || "",
                           },
                         ])
                       }
@@ -690,8 +644,8 @@ export const OrderCreateForm = ({
                               10
                             )
                         )
-                        ?.attributes.map((attr) => (
-                          <option key={attr.attribute_id} value={attr.value}>
+                        ?.attributes?.map((attr) => (
+                          <option key={attr.id} value={attr.id}>
                             {attr.value}
                           </option>
                         ))}
@@ -726,9 +680,9 @@ export const OrderCreateForm = ({
         </table>
       </section>
 
+      {/* 결제정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>결제정보</h3>
-
         <PaymentTable
           payment={payments[0]}
           onPaymentChange={handlePaymentChange(0)}
@@ -768,166 +722,111 @@ export const OrderCreateForm = ({
         </div>
       </section>
 
+      {/* 수선정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>수선정보</h3>
+        {event?.form?.repairs &&
+          chunk(event.form.repairs, 3).map((repairGroup, groupIndex) => (
+            <div key={groupIndex} className={styles.sectionGroupWrap}>
+              {repairGroup.map((repair) => {
+                const alterationDetail = formData.alteration_details.find(
+                  (detail) => detail.form_repair_id === repair.id
+                );
+                return (
+                  <div key={repair.id} className={styles.sectionVerticalGroup}>
+                    <h4 className={styles.sectionLabel}>
+                      {repair.information}
+                    </h4>
+                    <div className={styles.alterationInputGroup}>
+                      {/* 최종 길이 입력 필드 */}
+                      <div className={styles.inputWrapper}>
+                        <label className={styles.inputLabel}>최종 길이</label>
+                        <div className={styles.sectionGroup}>
+                          <input
+                            type="number"
+                            className={styles.numberInput}
+                            step="0.1"
+                            min="0"
+                            value={(alterationDetail?.figure || 0).toFixed(1)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === "" || isNaN(value)) {
+                                handleAlterationChange(repair.id, 0, "figure");
+                                return;
+                              }
+                              const numValue = parseFloat(
+                                parseFloat(value).toFixed(1)
+                              );
+                              handleAlterationChange(
+                                repair.id,
+                                numValue,
+                                "figure"
+                              );
+                            }}
+                            onKeyPress={(e) => {
+                              if (!/[\d.-]/.test(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                          />
+                          {repair.unit}
+                        </div>
+                      </div>
 
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 소매</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="jacketSleeve"
-                value={formData.alteration_details.jacketSleeve}
-                onChange={(e) =>
-                  handleAlterationChange("jacketSleeve", e.target.value)
-                }
-              />
-              {eventData?.form.jacketSleeve}
+                      {/* 수선해야 될 길이 입력 필드 */}
+                      <div className={styles.inputWrapper}>
+                        <label className={styles.inputLabel}>수선 길이</label>
+                        <div className={styles.sectionGroup}>
+                          <input
+                            type="number"
+                            className={styles.numberInput}
+                            step="0.1"
+                            value={(
+                              alterationDetail?.alterationFigure || 0
+                            ).toFixed(1)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === "" || isNaN(value)) {
+                                handleAlterationChange(
+                                  repair.id,
+                                  0,
+                                  "alterationFigure"
+                                );
+                                return;
+                              }
+                              const numValue = parseFloat(
+                                parseFloat(value).toFixed(1)
+                              );
+                              handleAlterationChange(
+                                repair.id,
+                                numValue,
+                                "alterationFigure"
+                              );
+                            }}
+                            onKeyPress={(e) => {
+                              if (!/[\d.-]/.test(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                          />
+                          {repair.unit}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 기장</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="jacketLength"
-                value={formData.alteration_details.jacketLength}
-                onChange={(e) =>
-                  handleAlterationChange("jacketLength", e.target.value)
-                }
-              />
-              {eventData?.form.jacketLength}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 폼</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="jacketForm"
-                value={formData.alteration_details.jacketForm}
-                onChange={(e) =>
-                  handleAlterationChange("jacketForm", e.target.value)
-                }
-              />
-              {eventData?.form.jacketForm}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>셔츠 목</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="shirtNeck"
-                value={formData.alteration_details.shirtNeck}
-                onChange={(e) =>
-                  handleAlterationChange("shirtNeck", e.target.value)
-                }
-              />
-              {eventData?.form.shirtNeck}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>셔츠 소매</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="shirtSleeve"
-                value={formData.alteration_details.shirtSleeve}
-                onChange={(e) =>
-                  handleAlterationChange("shirtSleeve", e.target.value)
-                }
-              />
-              {eventData?.form.shirtSleeve}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>바지 둘레</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="pantsCircumference"
-                value={formData.alteration_details.pantsCircumference}
-                onChange={(e) =>
-                  handleAlterationChange("pantsCircumference", e.target.value)
-                }
-              />
-              {eventData?.form.pantsCircumference}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>바지 길이</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="pantsLength"
-                value={formData.alteration_details.pantsLength}
-                onChange={(e) =>
-                  handleAlterationChange("pantsLength", e.target.value)
-                }
-              />
-              {eventData?.form.pantsLength}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>드레스 뒷품</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="dressBackForm"
-                value={formData.alteration_details.dressBackForm}
-                onChange={(e) =>
-                  handleAlterationChange("dressBackForm", e.target.value)
-                }
-              />
-              {eventData?.form.dressBackForm}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>드레스 기장</h4>
-            <div className={styles.sectionGroup}>
-              <input
-                type="number"
-                className={styles.numberInput}
-                name="dressLength"
-                value={formData.alteration_details.dressLength}
-                onChange={(e) =>
-                  handleAlterationChange("dressLength", e.target.value)
-                }
-              />
-              {eventData?.form.dressLength}
-            </div>
-          </div>
-        </div>
+          ))}
 
         <div className={styles.sectionValueWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
-              name="alterationNotes"
-              id="dressOptionalMessage"
               className={styles.optionalMessage}
-              value={formData.alteration_details.notes}
-              onChange={(e) => handleAlterationChange("notes", e.target.value)}
-            ></textarea>
+              value={formData.alter_notes}
+              onChange={(e) => handleAlterationNotes(e.target.value)}
+            />
           </div>
         </div>
       </section>
@@ -946,7 +845,7 @@ export const OrderCreateForm = ({
           className={styles.submitButton}
           onClick={() => handleSubmit(false)}
         >
-          {isEdit ? "수정 완료" : "작성 완료"}
+          작성 완료
         </Button>
       </div>
 

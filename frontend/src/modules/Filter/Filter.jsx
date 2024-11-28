@@ -1,11 +1,10 @@
 import React from "react";
 import { Button } from "../../components";
 import { ReactComponent as SearchIcon } from "../../asset/icon/search.svg";
-import { ReactComponent as RefreshIcon } from "../../asset/icon/refresh.svg"; // 새로고침 아이콘을 추가해주세요
+import { ReactComponent as RefreshIcon } from "../../asset/icon/refresh.svg";
 import styles from "./Filter.module.css";
 import { useAllEvents } from "../../api/hooks";
 
-// 초기 필터 상태를 상수로 정의
 const initialFilters = {
   search: "",
   status: "",
@@ -13,10 +12,11 @@ const initialFilters = {
   order_date_from: null,
   order_date_to: null,
   sort: "order_date_desc",
+  is_temp: false,
 };
 
 export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
-  const { data: events, isLoading: eventsLoading } = useAllEvents();
+  const { data: events } = useAllEvents();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -25,16 +25,11 @@ export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
 
   const handleDateChange = (e) => {
     const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value ? value : null }));
+    setFilters((prev) => ({ ...prev, [name]: value || null }));
   };
 
-  const handleSearch = () => {
-    console.log("Current filters:", filters);
-  };
-
-  // 필터 초기화 함수
   const handleReset = () => {
-    setFilters(initialFilters);
+    setFilters((prev) => ({ ...initialFilters, is_temp: prev.is_temp }));
   };
 
   return (
@@ -49,7 +44,7 @@ export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
           value={filters.search}
           onChange={handleInputChange}
         />
-        <Button className={styles.searchButton} onClick={handleSearch}>
+        <Button className={styles.searchButton}>
           <SearchIcon strokeOpacity="1" />
         </Button>
       </div>
@@ -63,13 +58,13 @@ export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
           onChange={handleInputChange}
         >
           <option value="">전체</option>
-          <option value="Order_Completed">주문완료</option>
-          <option value="Packaging_Completed">포장완료</option>
-          <option value="Repair_Received">수선접수</option>
-          <option value="Repair_Completed">수선완료</option>
-          <option value="In_delivery">배송중</option>
-          <option value="Delivery_completed">배송완료</option>
-          <option value="Receipt_completed">수령완료</option>
+          <option value="Order Completed">주문완료</option>
+          <option value="Packaging Completed">포장완료</option>
+          <option value="Repair Received">수선접수</option>
+          <option value="Repair Completed">수선완료</option>
+          <option value="In delivery">배송중</option>
+          <option value="Delivery completed">배송완료</option>
+          <option value="Receipt completed">수령완료</option>
           <option value="Accommodation">숙소</option>
         </select>
       </div>
@@ -84,12 +79,11 @@ export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
             onChange={handleInputChange}
           >
             <option value="">전체</option>
-            {!eventsLoading &&
-              events?.data.map((event) => (
-                <option key={event.id} value={event.name}>
-                  {event.name}
-                </option>
-              ))}
+            {events?.map((event) => (
+              <option key={event.id} value={event.name}>
+                {event.name}
+              </option>
+            ))}
           </select>
         </div>
       )}

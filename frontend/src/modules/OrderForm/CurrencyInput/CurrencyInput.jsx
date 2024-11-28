@@ -29,6 +29,7 @@ export const CurrencyInput = React.memo(
       "24K": 1,
     });
 
+    // 환율 정보 가져오기
     const fetchExchangeRates = async (date) => {
       try {
         const response = await axios.get(
@@ -49,6 +50,7 @@ export const CurrencyInput = React.memo(
       }
     };
 
+    // 금 시세 정보 가져오기
     const fetchGoldPrices = async (date) => {
       try {
         const response = await axios.get(
@@ -67,6 +69,7 @@ export const CurrencyInput = React.memo(
       }
     };
 
+    // 초기 환율과 금 시세 정보 로드
     useEffect(() => {
       const fetchRates = async () => {
         const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
@@ -78,6 +81,30 @@ export const CurrencyInput = React.memo(
       fetchRates();
     }, []);
 
+    // 외부에서 들어오는 초기값 변경을 감지하여 상태 업데이트
+    useEffect(() => {
+      if (initialAmount !== undefined) {
+        setAmount(initialAmount);
+        const convertedAmount = calculateConvertedAmount(
+          initialAmount,
+          currency
+        );
+        onChange(initialAmount, currency, convertedAmount);
+      }
+    }, [initialAmount]);
+
+    useEffect(() => {
+      if (initialCurrency) {
+        setCurrency(initialCurrency);
+        const convertedAmount = calculateConvertedAmount(
+          amount,
+          initialCurrency
+        );
+        onChange(amount, initialCurrency, convertedAmount);
+      }
+    }, [initialCurrency]);
+
+    // 환산 금액 계산
     const calculateConvertedAmount = useCallback(
       (newAmount, newCurrency) => {
         if (newAmount === null || !newCurrency) return null;
@@ -92,6 +119,7 @@ export const CurrencyInput = React.memo(
       [exchangeRates, goldPrices]
     );
 
+    // 통화 변경 핸들러
     const handleCurrencyChange = useCallback(
       (e) => {
         const newCurrency = e.target.value || null;
@@ -102,6 +130,7 @@ export const CurrencyInput = React.memo(
       [amount, onChange, calculateConvertedAmount]
     );
 
+    // 금액 변경 핸들러
     const handleAmountChange = useCallback(
       (e) => {
         const newAmount =
@@ -113,11 +142,13 @@ export const CurrencyInput = React.memo(
       [currency, onChange, calculateConvertedAmount]
     );
 
+    // 환산 금액 계산 (메모이제이션)
     const convertedAmount = useMemo(
       () => calculateConvertedAmount(amount, currency),
       [amount, currency, calculateConvertedAmount]
     );
 
+    // 통화 옵션 메모이제이션
     const currencyOptions = useMemo(
       () =>
         currencies.map((curr) => (
@@ -149,6 +180,7 @@ export const CurrencyInput = React.memo(
             className={styles.currencyInput}
             value={amount !== null ? amount : ""}
             onChange={handleAmountChange}
+            key={`${label}-${initialAmount}`}
           />
         </td>
         <td>
@@ -160,3 +192,5 @@ export const CurrencyInput = React.memo(
     );
   }
 );
+
+export default CurrencyInput;

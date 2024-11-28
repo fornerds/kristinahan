@@ -178,3 +178,53 @@
   gap: 5px;
   align-items: center;
 }
+
+.alterationInputGroup {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.inputWrapper {
+  flex: 1;
+}
+
+.inputLabel {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.numberInput {
+  width: 100px;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+}
+
+.alterationInputGroup {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.inputWrapper {
+  flex: 1;
+}
+
+.inputLabel {
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.numberInput {
+  width: 100px;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+}

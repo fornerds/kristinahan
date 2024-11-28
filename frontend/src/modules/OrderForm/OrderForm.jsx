@@ -4,13 +4,13 @@ import PaymentTable from "./PaymentTable/PaymentTable";
 import { Modal } from "../Modal";
 import styles from "./OrderForm.module.css";
 import {
-  useSaveOrder,
-  useSaveTempOrder,
   useOrderDetails,
   useAuthors,
   useAffiliations,
   useEventDetails,
   useCategories,
+  useSaveOrder,
+  useUpdateOrderStatus,
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
@@ -22,6 +22,14 @@ const ORDER_STATUS_MAP = {
   "Delivery completed": "배송완료",
   "Receipt completed": "수령완료",
   Accommodation: "숙소",
+};
+
+const chunk = (array, size) => {
+  const chunked = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunked.push(array.slice(i, i + size));
+  }
+  return chunked;
 };
 
 const convertStatusFromApiFormat = (status) => {
@@ -36,8 +44,10 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
   const { data: affiliations, isLoading: isLoadingAffiliations } =
     useAffiliations();
+  const saveOrderMutation = useSaveOrder();
+  const updateOrderStatusMutation = useUpdateOrderStatus();
 
-  // console.log(orderData?.data);
+  // console.log(orderData);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -55,15 +65,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     isTemporary: false,
     status: "",
     alteration_details: {
-      jacketForm: 0,
-      dressLength: 0,
-      pantsLength: 0,
-      shirtSleeve: 0,
-      jacketLength: 0,
-      dressBackForm: 0,
-      pantsCircumference: 0,
-      shirtNeck: 0,
-      jacketSleeve: 0,
       notes: "",
     },
   });
@@ -71,7 +72,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const [selectedProducts, setSelectedProducts] = useState({});
   const [orderCategories, setOrderCategories] = useState([]);
   const [customerName, setCustomerName] = useState("");
-  const [payerName, setPayerName] = useState("");
   const [affiliationError, setAffiliationError] = useState("");
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
@@ -79,7 +79,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const [totalPrice, setTotalPrice] = useState(0);
   const [payments, setPayments] = useState([
     {
-      payment_date: null,
+      payment_date: new Date().toISOString(),
       paymentMethod: "ADVANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -88,9 +88,11 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       tradeInAmount: 0,
       tradeInCurrency: "",
       notes: "",
+      totalConvertedAmount: 0,
+      payerName: "",
     },
     {
-      payment_date: null,
+      payment_date: new Date().toISOString(),
       paymentMethod: "BALANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
@@ -99,11 +101,28 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       tradeInAmount: 0,
       tradeInCurrency: "",
       notes: "",
+      totalConvertedAmount: 0,
+      payerName: "",
     },
   ]);
 
+  const initializePayments = (paymentData) => {
+    const totalAmount =
+      (Number(paymentData.cashAmount) || 0) +
+      (Number(paymentData.cardAmount) || 0) +
+      (Number(paymentData.tradeInAmount) || 0);
+
+    return {
+      ...paymentData,
+      cashAmount: Number(paymentData.cashAmount) || 0,
+      cardAmount: Number(paymentData.cardAmount) || 0,
+      tradeInAmount: Number(paymentData.tradeInAmount) || 0,
+      totalConvertedAmount: totalAmount,
+    };
+  };
+
   const groupedProducts = useMemo(() => {
-    if (!categories?.data || !event?.data) return {};
+    if (!categories || !event) return {};
     const newGroupedProducts = {};
     orderCategories.forEach((category) => {
       newGroupedProducts[category.id] = category.products;
@@ -113,44 +132,158 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
   // console.log(groupedProducts);
 
-  useEffect(() => {
-    if (orderData?.data && categories?.data) {
-      const orderDetails = orderData.data;
-      setFormData((prev) => ({
-        ...prev,
-        ...orderDetails,
-        status: convertStatusFromApiFormat(orderDetails.status),
-        alteration_details: orderDetails.alteration_details || {
-          jacketForm: 0,
-          dressLength: 0,
-          pantsLength: 0,
-          shirtSleeve: 0,
-          jacketLength: 0,
-          dressBackForm: 0,
-          pantsCircumference: 0,
-          shirtNeck: 0,
-          jacketSleeve: 0,
-          notes: "",
-        },
-        author_id: orderDetails.author_id || "",
-        modifier_id: orderDetails.modifier_id || "",
+  const prepareOrderData = useCallback(() => {
+    const safeParseInt = (value) => {
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    const safeParseFloat = (value) => {
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const convertStatusToApiFormat = (status) => {
+      return status.replace(/ /g, "_");
+    };
+
+    const convertTradeInCurrency = (currency) => {
+      if (!currency) return null;
+      const currencyMap = {
+        "10K": "K10",
+        "14K": "K14",
+        "18K": "K18",
+        "24K": "K24",
+      };
+      return currencyMap[currency] || currency;
+    };
+
+    const orderItems = Object.values(selectedProducts)
+      .filter((item) => item.productId)
+      .map((item) => ({
+        product_id: safeParseInt(item.productId),
+        attributes_id:
+          item.attributes && item.attributes.length > 0
+            ? safeParseInt(item.attributes[0].id)
+            : null,
+        quantity: safeParseInt(item.quantity) || 0,
+        price: (item.price || 0) * (safeParseInt(item.quantity) || 0),
       }));
 
-      setPayerName(orderDetails.payments[0]?.payer || "");
-      setPrepaymentTotal(orderDetails.advancePayment);
-      setBalanceTotal(orderDetails.balancePayment);
-      setTotalPrice(orderDetails.totalPrice);
+    const paymentsData = payments.map((payment) => {
+      const basePayment = {
+        payer: payment.payerName || formData.groomName,
+        payment_date: payment.payment_date || new Date().toISOString(),
+        paymentMethod: payment.paymentMethod.toLowerCase(),
+        notes: payment.notes || "",
+      };
 
-      // Filter categories based on orderDetails.form.categories
-      const filteredCategories = categories.data.filter((category) =>
-        orderDetails.form.categories.some(
+      if (payment.cashAmount && payment.cashAmount > 0) {
+        basePayment.cashAmount = safeParseInt(payment.cashAmount);
+        basePayment.cashCurrency = payment.cashCurrency;
+      }
+
+      if (payment.cardAmount && payment.cardAmount > 0) {
+        basePayment.cardAmount = safeParseInt(payment.cardAmount);
+        basePayment.cardCurrency = payment.cardCurrency;
+      }
+
+      if (payment.tradeInAmount && payment.tradeInAmount > 0) {
+        basePayment.tradeInAmount = safeParseInt(payment.tradeInAmount);
+        basePayment.tradeInCurrency = convertTradeInCurrency(
+          payment.tradeInCurrency
+        );
+      }
+
+      return basePayment;
+    });
+
+    // Update alteration_details to new format
+    const alterationDetails = event?.form?.repairs
+      ?.map((repair) => {
+        const figureValue =
+          formData.alteration_details[`${repair.type}_figure`] || 0;
+        const alterationValue =
+          formData.alteration_details[`${repair.type}_alteration`] || 0;
+
+        return {
+          form_repair_id: repair.id,
+          figure: safeParseFloat(figureValue),
+          alterationFigure: safeParseFloat(alterationValue),
+        };
+      })
+      .filter((detail) => detail.figure !== 0 || detail.alterationFigure !== 0);
+
+    return {
+      event_id: safeParseInt(event_id),
+      author_id: safeParseInt(formData.author_id),
+      modifier_id: safeParseInt(formData.modifier_id),
+      affiliation_id: safeParseInt(formData.affiliation_id),
+      status: convertStatusToApiFormat(formData.status),
+      groomName: formData.groomName || null,
+      brideName: formData.brideName || null,
+      contact: formData.contact || "",
+      address: formData.address || "",
+      collectionMethod: formData.collectionMethod || "",
+      notes: formData.notes || "",
+      alter_notes: formData.alteration_details.notes || "",
+      totalPrice: totalPrice,
+      advancePayment: prepaymentTotal,
+      balancePayment: balanceTotal,
+      orderItems: orderItems,
+      payments: paymentsData,
+      alteration_details: alterationDetails,
+    };
+  }, [
+    formData,
+    event_id,
+    selectedProducts,
+    payments,
+    totalPrice,
+    prepaymentTotal,
+    balanceTotal,
+    event, // Add event to dependencies
+  ]);
+
+  useEffect(() => {
+    if (orderData && categories) {
+      // console.log("orderData.payments:", orderData.payments);
+
+      // 결제 정보 초기화
+      const advancePayment = orderData.payments.find(
+        (p) => p.paymentMethod === "advance"
+      );
+      const balancePayment = orderData.payments.find(
+        (p) => p.paymentMethod === "balance"
+      );
+
+      // console.log("Found payments:", { advancePayment, balancePayment });
+
+      // alteration details 초기화
+      const alterationDetailsObj = {
+        notes: orderData.alter_notes || "",
+      };
+
+      if (event?.form?.repairs) {
+        event.form.repairs.forEach((repair) => {
+          const detail = orderData.alteration_details?.find(
+            (d) => d.form_repair_id === repair.id
+          );
+          alterationDetailsObj[`${repair.type}_figure`] = detail?.figure || 0;
+          alterationDetailsObj[`${repair.type}_alteration`] =
+            detail?.alterationFigure || 0;
+        });
+      }
+
+      // 상품 정보 초기화
+      const filteredCategories = categories.filter((category) =>
+        orderData.form.categories.some(
           (formCategory) => formCategory.id === category.id
         )
       );
-      setOrderCategories(filteredCategories);
 
       const newSelectedProducts = {};
-      orderDetails.orderItems.forEach((item) => {
+      orderData.orderItems.forEach((item) => {
         const category = filteredCategories.find((cat) =>
           cat.products.some((prod) => prod.id === item.product.id)
         );
@@ -163,21 +296,69 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           };
         }
       });
+
+      // payments 초기화
+      const initialPayments = [
+        {
+          payment_date:
+            advancePayment?.payment_date || new Date().toISOString(),
+          paymentMethod: "ADVANCE",
+          cashAmount: Number(advancePayment?.cashAmount) || 0,
+          cashCurrency: advancePayment?.cashCurrency || "KRW",
+          cardAmount: Number(advancePayment?.cardAmount) || 0,
+          cardCurrency: advancePayment?.cardCurrency || "KRW",
+          tradeInAmount: Number(advancePayment?.tradeInAmount) || 0,
+          tradeInCurrency: advancePayment?.tradeInCurrency || "",
+          notes: advancePayment?.notes || "",
+          payer: advancePayment?.payer || "",
+          payerName: advancePayment?.payer || "",
+        },
+        {
+          payment_date:
+            balancePayment?.payment_date || new Date().toISOString(),
+          paymentMethod: "BALANCE",
+          cashAmount: Number(balancePayment?.cashAmount) || 0,
+          cashCurrency: balancePayment?.cashCurrency || "KRW",
+          cardAmount: Number(balancePayment?.cardAmount) || 0,
+          cardCurrency: balancePayment?.cardCurrency || "KRW",
+          tradeInAmount: Number(balancePayment?.tradeInAmount) || 0,
+          tradeInCurrency: balancePayment?.tradeInCurrency || "",
+          notes: balancePayment?.notes || "",
+          payer: balancePayment?.payer || "",
+          payerName: balancePayment?.payer || "",
+        },
+      ].map((payment) => initializePayments(payment));
+      // console.log("Initialized payments:", initialPayments);
+
+      // 모든 상태 한번에 업데이트
+      setPayments(initialPayments);
+      setPrepaymentTotal(initialPayments[0].totalConvertedAmount);
+      setBalanceTotal(initialPayments[1].totalConvertedAmount);
+      setFormData((prev) => ({
+        ...prev,
+        ...orderData,
+        status: convertStatusFromApiFormat(orderData.status),
+        alteration_details: alterationDetailsObj,
+        author_id: orderData.author_id || "",
+        modifier_id: orderData.modifier_id || "",
+      }));
+      setOrderCategories(filteredCategories);
       setSelectedProducts(newSelectedProducts);
-
-      const advancePayment =
-        orderDetails.payments.find((p) => p.paymentMethod === "ADVANCE") ||
-        payments[0];
-      const balancePayment =
-        orderDetails.payments.find((p) => p.paymentMethod === "BALANCE") ||
-        payments[1];
-
-      setPayments([
-        { ...advancePayment, paymentMethod: "ADVANCE" },
-        { ...balancePayment, paymentMethod: "BALANCE" },
-      ]);
+      setTotalPrice(orderData.totalPrice || 0);
+      setCustomerName(orderData.groomName || "");
     }
-  }, [orderData, categories]);
+  }, [orderData?.id, categories, event?.form?.repairs]);
+
+  const handleStatusUpdate = async (newStatus) => {
+    try {
+      await updateOrderStatusMutation.mutateAsync({
+        orderId: orderId,
+        status: newStatus,
+      });
+    } catch (error) {
+      console.error("Status update failed:", error);
+    }
+  };
 
   const handleAuthorChange = (e) => {
     const { value } = e.target;
@@ -198,6 +379,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const handleStatusChange = (e) => {
     const { value } = e.target;
     setFormData((prev) => ({ ...prev, status: value }));
+    handleStatusUpdate(value);
   };
 
   const handleContactChange = (e) => {
@@ -243,21 +425,36 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   };
 
   const handleAlterationChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      alteration_details: {
-        ...prev.alteration_details,
-        [field]: value,
-      },
-      // alter_notes도 동기화 (notes 필드가 변경될 때)
-      ...(field === "notes" ? { alter_notes: value } : {}),
-    }));
+    if (field === "notes") {
+      setFormData((prev) => ({
+        ...prev,
+        alteration_details: {
+          ...prev.alteration_details,
+          notes: value,
+        },
+        alter_notes: value,
+      }));
+    } else {
+      setFormData((prev) => {
+        const currentDetails = { ...prev.alteration_details };
+        const [repairType, fieldType] = field.split("_");
+
+        if (fieldType === "figure" || fieldType === "alteration") {
+          currentDetails[field] = parseFloat(parseFloat(value).toFixed(1));
+        }
+
+        return {
+          ...prev,
+          alteration_details: currentDetails,
+        };
+      });
+    }
   };
 
   const handleGroomNameChange = useCallback((e) => {
     const newGroomName = e.target.value;
     setFormData((prev) => ({ ...prev, groomName: newGroomName }));
-  });
+  }, []);
 
   const handleBrideNameChange = useCallback((e) => {
     const newBrideName = e.target.value;
@@ -266,9 +463,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
-      // console.log(
-      //   `handleProductChange called: categoryId=${categoryId}, field=${field}, value=${value}`
-      // );
       setSelectedProducts((prev) => {
         const newState = { ...prev };
         if (field === "productId") {
@@ -276,7 +470,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === productId
           );
-          // console.log("Selected product:", selectedProduct);
           if (selectedProduct) {
             newState[categoryId] = {
               productId: selectedProduct.id,
@@ -299,13 +492,11 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === newState[categoryId].productId
           );
-          // console.log("Selected product for attributes:", selectedProduct);
           if (selectedProduct) {
             const selectedAttributeId = parseInt(value, 10);
             const selectedAttribute = selectedProduct.attributes.find(
               (attr) => attr.id === selectedAttributeId
             );
-            // console.log("Selected attribute:", selectedAttribute);
             if (selectedAttribute) {
               newState[categoryId] = {
                 ...newState[categoryId],
@@ -324,7 +515,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
             [field]: value,
           };
         }
-        // console.log("newState", newState);
         return newState;
       });
     },
@@ -332,26 +522,33 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   );
 
   const handlePaymentChange = useCallback((index, updatedPayment) => {
+    // 각 지급 방법별 원화환산액 계산
+    const cashConverted = Number(updatedPayment.cashAmount || 0);
+    const cardConverted = Number(updatedPayment.cardAmount || 0);
+    const tradeInConverted = Number(updatedPayment.tradeInAmount || 0);
+
+    // 원화환산액 총액 계산
+    const totalConverted = cashConverted + cardConverted + tradeInConverted;
+
+    // payments 상태 업데이트
     setPayments((prev) => {
       const newPayments = [...prev];
-      newPayments[index] = updatedPayment;
+      newPayments[index] = {
+        ...updatedPayment,
+        totalConvertedAmount: totalConverted,
+        // 각 지급 방법별 원화환산액 저장
+        cashConvertedAmount: cashConverted,
+        cardConvertedAmount: cardConverted,
+        tradeInConvertedAmount: tradeInConverted,
+      };
       return newPayments;
     });
 
-    // 로그를 추가하여 디버깅
-    // console.log("Payment updated:", updatedPayment);
-    // console.log("Payment method:", updatedPayment.paymentMethod);
-    // console.log("Total converted amount:", updatedPayment.totalConvertedAmount);
-
-    // totalConvertedAmount가 undefined인 경우 0으로 처리
-    const amount = updatedPayment.totalConvertedAmount || 0;
-
-    if (updatedPayment.paymentMethod === "ADVANCE") {
-      setPrepaymentTotal(amount);
-      // console.log("Setting prepayment total:", amount);
-    } else if (updatedPayment.paymentMethod === "BALANCE") {
-      setBalanceTotal(amount);
-      // console.log("Setting balance total:", amount);
+    // 선입금/잔금 총액 업데이트
+    if (index === 0) {
+      setPrepaymentTotal(totalConverted);
+    } else {
+      setBalanceTotal(totalConverted);
     }
   }, []);
 
@@ -369,128 +566,10 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     }));
   }, [selectedProducts, prepaymentTotal, balanceTotal]);
 
-  const prepareOrderData = useCallback(() => {
-    const safeParseInt = (value) => {
-      const parsed = parseInt(value, 10);
-      return isNaN(parsed) ? null : parsed;
-    };
-
-    // Convert status format from "Order Completed" to "Order_Completed"
-    const convertStatusToApiFormat = (status) => {
-      return status.replace(/ /g, "_");
-    };
-
-    // Convert trade-in currency format (10K -> K10)
-    const convertTradeInCurrency = (currency) => {
-      if (!currency) return null;
-      const currencyMap = {
-        "10K": "K10",
-        "14K": "K14",
-        "18K": "K18",
-        "24K": "K24",
-      };
-      return currencyMap[currency] || currency;
-    };
-
-    // Prepare order items
-    const orderItems = Object.values(selectedProducts)
-      .filter((item) => item.productId)
-      .map((item) => ({
-        product_id: safeParseInt(item.productId),
-        attributes_id:
-          item.attributes && item.attributes.length > 0
-            ? safeParseInt(item.attributes[0].id)
-            : null,
-        quantity: safeParseInt(item.quantity) || 0,
-        price: (item.price || 0) * (safeParseInt(item.quantity) || 0),
-      }));
-
-    // Prepare payments data according to API format
-    const paymentsData = payments.map((payment) => {
-      const basePayment = {
-        payer: payment.payerName || formData.groomName,
-        payment_date: payment.payment_date || new Date().toISOString(),
-        paymentMethod: payment.paymentMethod.toLowerCase(), // Convert to lowercase
-        notes: payment.notes || "",
-      };
-
-      // Only add amount and currency if they exist
-      if (payment.cashAmount && payment.cashAmount > 0) {
-        basePayment.cashAmount = safeParseInt(payment.cashAmount);
-        basePayment.cashCurrency = payment.cashCurrency;
-      }
-
-      if (payment.cardAmount && payment.cardAmount > 0) {
-        basePayment.cardAmount = safeParseInt(payment.cardAmount);
-        basePayment.cardCurrency = payment.cardCurrency;
-      }
-
-      if (payment.tradeInAmount && payment.tradeInAmount > 0) {
-        basePayment.tradeInAmount = safeParseInt(payment.tradeInAmount);
-        basePayment.tradeInCurrency = convertTradeInCurrency(
-          payment.tradeInCurrency
-        );
-      }
-
-      return basePayment;
-    });
-
-    // alteration_details as object, not array
-    const alterationDetails = {
-      jacketSleeve: safeParseInt(formData.alteration_details.jacketSleeve) || 0,
-      jacketLength: safeParseInt(formData.alteration_details.jacketLength) || 0,
-      jacketForm: safeParseInt(formData.alteration_details.jacketForm) || 0,
-      pantsCircumference:
-        safeParseInt(formData.alteration_details.pantsCircumference) || 0,
-      pantsLength: safeParseInt(formData.alteration_details.pantsLength) || 0,
-      shirtNeck: safeParseInt(formData.alteration_details.shirtNeck) || 0,
-      shirtSleeve: safeParseInt(formData.alteration_details.shirtSleeve) || 0,
-      dressBackForm:
-        safeParseInt(formData.alteration_details.dressBackForm) || 0,
-      dressLength: safeParseInt(formData.alteration_details.dressLength) || 0,
-      notes: formData.alteration_details.notes || "",
-    };
-
-    // Prepare final data according to API spec
-    return {
-      event_id: safeParseInt(event_id),
-      author_id: safeParseInt(formData.author_id),
-      modifier_id: safeParseInt(formData.modifier_id),
-      affiliation_id: safeParseInt(formData.affiliation_id),
-      status: convertStatusToApiFormat(formData.status),
-      groomName: formData.groomName || null,
-      brideName: formData.brideName || null,
-      contact: formData.contact || "",
-      address: formData.address || "",
-      collectionMethod: formData.collectionMethod || "",
-      notes: formData.notes || "",
-      alter_notes: formData.alteration_details.notes || "",
-      totalPrice: totalPrice,
-      advancePayment: prepaymentTotal,
-      balancePayment: balanceTotal,
-      orderItems: orderItems,
-      payments: paymentsData,
-      alteration_details: alterationDetails,
-    };
-  }, [
-    formData,
-    event_id,
-    selectedProducts,
-    payments,
-    totalPrice,
-    prepaymentTotal,
-    balanceTotal,
-  ]);
-
-  useEffect(() => {
-    if (onSave) {
-      onSave(() => prepareOrderData);
-    }
-  }, [onSave, prepareOrderData]);
-
   useEffect(() => {
     if (onSave) {
       onSave(prepareOrderData);
+      console.log(prepareOrderData);
     }
   }, [onSave, prepareOrderData]);
 
@@ -499,7 +578,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     isLoadingAuthors ||
     isLoadingAffiliations ||
     isEventLoading ||
-    isCategoriesLoading
+    isCategoriesLoading ||
+    saveOrderMutation.isLoading ||
+    updateOrderStatusMutation.isLoading
   ) {
     return <div>Loading...</div>;
   }
@@ -524,8 +605,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
               value={formData.modifier_id || ""}
             >
               <option value="">수정자 선택</option>
-              {authors?.data &&
-                authors?.data.map((author) => (
+              {authors &&
+                authors.map((author) => (
                   <option key={author.id} value={author.id}>
                     {author.name}
                   </option>
@@ -547,8 +628,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
               value={formData.author_id || ""}
             >
               <option value="">작성자 선택</option>
-              {authors?.data &&
-                authors?.data.map((author) => (
+              {authors &&
+                authors.map((author) => (
                   <option key={author.id} value={author.id}>
                     {author.name}
                   </option>
@@ -558,7 +639,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionGroup}>
             <h4 className={styles.sectionLabel}>작성일자</h4>
             <p className={styles.sectionValue}>
-              {new Date(orderData?.data.created_at).toLocaleDateString("ko-KR")}
+              {orderData?.created_at
+                ? new Date(orderData.created_at).toLocaleDateString("ko-KR")
+                : "-"}
             </p>
           </div>
         </div>
@@ -609,6 +692,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
             />
           </div>
         </div>
+
         <div className={styles.sectionGroupWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>연락처</h4>
@@ -629,8 +713,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
               onChange={handleAffiliationChange}
             >
               <option value="">소속 선택</option>
-              {affiliations?.data &&
-                affiliations?.data.map((affiliation) => (
+              {affiliations &&
+                affiliations.map((affiliation) => (
                   <option key={affiliation.id} value={affiliation.id}>
                     {affiliation.name}
                   </option>
@@ -800,17 +884,25 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           </div>
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>선입금 총액</h4>
-            <p className={styles.paid}>{prepaymentTotal.toLocaleString()} 원</p>
+            <p className={styles.paid}>
+              {payments[0].totalConvertedAmount?.toLocaleString() || 0} 원
+            </p>
           </div>
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>잔금 총액</h4>
-            <p className={styles.paid}>{balanceTotal.toLocaleString()} 원</p>
+            <p className={styles.paid}>
+              {payments[1].totalConvertedAmount?.toLocaleString() || 0} 원
+            </p>
           </div>
           <hr className={styles.hr} />
           <div className={styles.spacebetween}>
             <h4 className={styles.sectionLabel}>총 잔액</h4>
             <p className={styles.rest}>
-              {(totalPrice - prepaymentTotal - balanceTotal).toLocaleString()}{" "}
+              {(
+                totalPrice -
+                (payments[0].totalConvertedAmount || 0) -
+                (payments[1].totalConvertedAmount || 0)
+              ).toLocaleString()}{" "}
               원
             </p>
           </div>
@@ -819,173 +911,97 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>수선정보</h3>
+        {event?.form?.repairs &&
+          chunk(event.form.repairs, 3).map((repairGroup, groupIndex) => (
+            <div key={groupIndex} className={styles.sectionGroupWrap}>
+              {repairGroup.map((repair) => (
+                <div key={repair.id} className={styles.sectionVerticalGroup}>
+                  <h4 className={styles.sectionLabel}>{repair.information}</h4>
+                  <div className={styles.alterationInputGroup}>
+                    {/* 최종 길이 입력 필드 */}
+                    <div className={styles.inputWrapper}>
+                      <label className={styles.inputLabel}>최종 길이</label>
+                      <div className={styles.sectionGroup}>
+                        <input
+                          type="number"
+                          className={styles.numberInput}
+                          step="0.1"
+                          min="0"
+                          value={(
+                            formData.alteration_details[
+                              `${repair.type}_figure`
+                            ] || 0
+                          ).toFixed(1)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || isNaN(value)) {
+                              handleAlterationChange(
+                                `${repair.type}_figure`,
+                                0
+                              );
+                              return;
+                            }
+                            const numValue = parseFloat(
+                              parseFloat(value).toFixed(1)
+                            );
+                            handleAlterationChange(
+                              `${repair.type}_figure`,
+                              numValue
+                            );
+                          }}
+                        />
+                        {repair.unit}
+                      </div>
+                    </div>
 
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 소매</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="jacketSleeve"
-                value={formData.alteration_details.jacketSleeve}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("jacketSleeve", value);
-                }}
-              />
-              {event?.data?.form.jacketSleeve}
+                    {/* 수선 길이 입력 필드 */}
+                    <div className={styles.inputWrapper}>
+                      <label className={styles.inputLabel}>수선 길이</label>
+                      <div className={styles.sectionGroup}>
+                        <input
+                          type="number"
+                          className={styles.numberInput}
+                          step="0.1"
+                          value={(
+                            formData.alteration_details[
+                              `${repair.type}_alteration`
+                            ] || 0
+                          ).toFixed(1)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || isNaN(value)) {
+                              handleAlterationChange(
+                                `${repair.type}_alteration`,
+                                0
+                              );
+                              return;
+                            }
+                            const numValue = parseFloat(
+                              parseFloat(value).toFixed(1)
+                            );
+                            handleAlterationChange(
+                              `${repair.type}_alteration`,
+                              numValue
+                            );
+                          }}
+                        />
+                        {repair.unit}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 기장</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="jacketLength"
-                value={formData.alteration_details.jacketLength}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("jacketLength", value);
-                }}
-              />
-              {event?.data?.form.jacketLength}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>자켓 폼</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="jacketForm"
-                value={formData.alteration_details.jacketForm}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("jacketForm", value);
-                }}
-              />
-              {event?.data?.form.jacketForm}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>셔츠 목</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="shirtNeck"
-                value={formData.alteration_details.shirtNeck}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("shirtNeck", value);
-                }}
-              />
-              {event?.data?.form.shirtNeck}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>셔츠 소매</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="shirtSleeve"
-                value={formData.alteration_details.shirtSleeve}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("shirtSleeve", value);
-                }}
-              />
-              {event?.data?.form.shirtSleeve}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>바지 둘레</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="pantsCircumference"
-                value={formData.alteration_details.pantsCircumference}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("pantsCircumference", value);
-                }}
-              />
-              {event?.data?.form.pantsCircumference}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>바지 길이</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="pantsLength"
-                value={formData.alteration_details.pantsLength}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("pantsLength", value);
-                }}
-              />
-              {event?.data?.form.pantsLength}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.sectionGroupWrap}>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>드레스 뒷품</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="dressBackForm"
-                value={formData.alteration_details.dressBackForm}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("dressBackForm", value);
-                }}
-              />
-              {event?.data?.form.dressBackForm}
-            </div>
-          </div>
-          <div className={styles.sectionVerticalGroup}>
-            <h4 className={styles.sectionLabel}>드레스 기장</h4>
-            <div className={styles.sectionGroup}>
-              <Input
-                type="number"
-                className={styles.numberInput}
-                name="dressLength"
-                value={formData.alteration_details.dressLength}
-                onChange={(e) => {
-                  const value = parseFloat(e.target.value) || 0;
-                  handleAlterationChange("dressLength", value);
-                }}
-              />
-              {event?.data?.form.dressLength}
-            </div>
-          </div>
-        </div>
+          ))}
 
         <div className={styles.sectionValueWrap}>
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
-              name="alterationNotes"
-              id="dressOptionalMessage"
               className={styles.optionalMessage}
               value={formData.alteration_details.notes}
               onChange={(e) => handleAlterationChange("notes", e.target.value)}
-            ></textarea>
+            />
           </div>
         </div>
       </section>

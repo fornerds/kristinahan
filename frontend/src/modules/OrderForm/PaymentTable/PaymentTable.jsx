@@ -11,33 +11,31 @@ const PaymentTable = ({
 }) => {
   const [isDateSelected, setIsDateSelected] = useState(!!payment.payment_date);
 
+  // 총액 계산 함수
+  const calculateTotalAmount = useCallback((updatedPayment) => {
+    return (
+      (Number(updatedPayment.cashAmount) || 0) +
+      (Number(updatedPayment.cardAmount) || 0) +
+      (Number(updatedPayment.tradeInAmount) || 0)
+    );
+  }, []);
+
   // 초기 데이터 설정을 위한 useEffect
   useEffect(() => {
-    if (payment) {
-      let totalConvertedAmount = 0;
+    if (payment && !payment.totalConvertedAmount) {
+      const totalConvertedAmount = calculateTotalAmount(payment);
 
-      // 현금 결제 데이터가 있는 경우
-      if (payment.cashAmount && payment.cashCurrency) {
-        totalConvertedAmount += Number(payment.cashAmount);
-      }
-      // 카드 결제 데이터가 있는 경우
-      if (payment.cardAmount && payment.cardCurrency) {
-        totalConvertedAmount += Number(payment.cardAmount);
-      }
-      // 보상판매 데이터가 있는 경우
-      if (payment.tradeInAmount && payment.tradeInCurrency) {
-        totalConvertedAmount += Number(payment.tradeInAmount);
-      }
-
-      // 총액이 있는 경우 업데이트
-      if (totalConvertedAmount > 0) {
+      if (
+        totalConvertedAmount > 0 &&
+        totalConvertedAmount !== payment.totalConvertedAmount
+      ) {
         onPaymentChange({
           ...payment,
           totalConvertedAmount,
         });
       }
     }
-  }, [payment, onPaymentChange]);
+  }, []); // 마운트 시에만 실행
 
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
@@ -47,20 +45,7 @@ const PaymentTable = ({
         [`${field}Currency`]: currency || null,
       };
 
-      // 현재 필드의 환산액 계산
-      const currentFieldAmount =
-        field === "cash" ? Number(amount) || 0 : payment[`${field}Amount`] || 0;
-
-      // 다른 필드들의 기존 금액 합산
-      const otherFieldsAmount = Object.entries(payment)
-        .filter(
-          ([key, value]) =>
-            key.endsWith("Amount") && !key.startsWith(field) && value !== null
-        )
-        .reduce((sum, [_, value]) => sum + Number(value), 0);
-
-      // 총 환산액 계산
-      const totalConvertedAmount = currentFieldAmount + otherFieldsAmount;
+      const totalConvertedAmount = calculateTotalAmount(updatedPayment);
 
       onPaymentChange({
         ...updatedPayment,
@@ -68,7 +53,7 @@ const PaymentTable = ({
         paymentMethod: payment.paymentMethod,
       });
     },
-    [onPaymentChange, payment]
+    [onPaymentChange, payment, calculateTotalAmount]
   );
 
   const handleDateChange = (e) => {

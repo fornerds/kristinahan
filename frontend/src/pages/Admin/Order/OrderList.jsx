@@ -16,6 +16,7 @@ import {
   useAuthors,
   useAffiliations,
   useUpdateOrderStatus,
+  useDownloadOrders,
 } from "../../../api/hooks";
 
 const formatOrderStatus = (status) => {
@@ -71,12 +72,7 @@ export const OrderList = () => {
   const { data: authorsData } = useAuthors();
   const { data: affiliationsData } = useAffiliations();
   const updateOrderStatusMutation = useUpdateOrderStatus();
-
-  const { data: excelData, isLoading: isExcelDataLoading } = useOrders({
-    ...filters,
-    limit: 100000,
-    offset: 0,
-  });
+  const downloadOrdersMutation = useDownloadOrders();
 
   const authors = authorsData?.reduce((acc, author) => {
     acc[author.id] = author.name;
@@ -87,8 +83,6 @@ export const OrderList = () => {
     acc[affiliation.id] = affiliation.name;
     return acc;
   }, {});
-
-  console.log("ordersData", ordersData);
 
   const orders = ordersData?.orders || [];
   const total = ordersData?.total || 0;
@@ -128,59 +122,12 @@ export const OrderList = () => {
 
   const handleExcelDownload = useCallback(async () => {
     try {
-      if (isExcelDataLoading) {
-        alert("데이터를 불러오는 중입니다. 잠시만 기다려주세요.");
-        return;
-      }
-
-      if (!excelData?.orders) {
-        throw new Error("데이터를 불러올 수 없습니다.");
-      }
-
-      const formattedData = excelData.orders.map((order) => ({
-        주문번호: order.id,
-        작성자: authors[order.author_id] || order.author_id,
-        주문자: order.groomName,
-        소속: affiliations[order.affiliation_id] || order.affiliation_id,
-        수령방법: getCollectionMethod(order.collectionMethod),
-        주문상태: formatOrderStatus(order.status),
-        주문일자: new Date(order.created_at).toLocaleDateString(),
-        총주문금액: order.totalPrice?.toLocaleString() || "0",
-        선입금: order.advancePayment?.toLocaleString() || "0",
-        잔금: order.balancePayment?.toLocaleString() || "0",
-        총결제금액: (
-          (order.advancePayment || 0) + (order.balancePayment || 0)
-        ).toLocaleString(),
-        결제자: order.payments?.[0]?.payer || order.groomName,
-        주소: order.address || "",
-        행사: order.event_name,
-        연락처: order.contact || "",
-        기타사항: order.notes || "",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(formattedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "주문서목록");
-
-      const max_width = 50;
-      const colWidths = Object.keys(formattedData[0] || {}).map((key) => ({
-        wch: Math.min(
-          max_width,
-          Math.max(
-            key.length,
-            ...formattedData.map((row) => String(row[key] || "").length)
-          )
-        ),
-      }));
-      worksheet["!cols"] = colWidths;
-
-      const today = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(workbook, `주문서목록_${today}.xlsx`);
+      await downloadOrdersMutation.mutateAsync(filters);
     } catch (error) {
       console.error("Excel download failed:", error);
       alert("엑셀 다운로드에 실패했습니다. 다시 시도해주세요.");
     }
-  }, [excelData, isExcelDataLoading, authors, affiliations]);
+  }, [downloadOrdersMutation, filters]);
 
   const handleTabChange = (tabName) => {
     setFilters((prev) => ({
@@ -239,13 +186,13 @@ export const OrderList = () => {
               }
               className={styles.orderLink}
             >
-              <td>{authors?.[order.author_id] || order.author_id || "없음"}</td>
-              <td>{order.groomName}</td>
-              <td>{order.brideName}</td>
+              <td>{authors?.[order.author_id] || order.author_id || "-"}</td>
+              <td>{order.groomName || "-"}</td>
+              <td>{order.brideName || "-"}</td>
               <td>
                 {affiliations[order.affiliation_id] ||
                   order.affiliation_id ||
-                  "없음"}
+                  "-"}
               </td>
               <td>{getCollectionMethod(order.collectionMethod)}</td>
               <td>
@@ -266,12 +213,16 @@ export const OrderList = () => {
                   <option value="Accommodation">숙소</option>
                 </select>
               </td>
-              <td>{new Date(order.created_at).toLocaleDateString()}</td>
-              <td>{order.totalPrice}</td>
-              <td>{order.advancePayment + order.balancePayment}</td>
-              <td>{order.payments[0].payer}</td>
-              <td>{order.address}</td>
-              <td>{order.event_name}</td>
+              <td>{new Date(order.created_at).toLocaleDateString() || "-"}</td>
+              <td>{order.totalPrice || "-"}</td>
+              <td>{order.advancePayment + order.balancePayment || "-"}</td>
+              <td>
+                {order.payments && order.payments.length > 0
+                  ? order.payments[0]?.payer || "-"
+                  : "-"}
+              </td>
+              <td>{order.address || "-"}</td>
+              <td>{order.event_name || "-"}</td>
             </tr>
           ))
         )}
@@ -297,7 +248,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
-                  disabled={isExcelDataLoading}
+                  disabled={downloadOrdersMutation.isLoading}
                 />
                 <Button
                   label="주문서 작성"
@@ -325,7 +276,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
-                  disabled={isExcelDataLoading}
+                  disabled={downloadOrdersMutation.isLoading}
                 />
                 <Button
                   label="주문서 작성"
