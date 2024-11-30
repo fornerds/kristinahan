@@ -13,46 +13,77 @@ import {
   useDownloadOrders,
 } from "../../../api/hooks";
 
+const formatOrderStatus = (status) => {
+  const statusMap = {
+    "Order Completed": "주문완료",
+    "Packaging Completed": "포장완료",
+    "Repair Received": "수선접수",
+    "Repair Completed": "수선완료",
+    "In delivery": "배송중",
+    "Delivery completed": "배송완료",
+    "Receipt completed": "수령완료",
+    Accommodation: "숙소",
+  };
+  return statusMap[status] || status;
+};
+
+const getCollectionMethod = (method) => {
+  switch (method) {
+    case "Delivery":
+      return "배송";
+    case "Pickup on site":
+      return "현장수령";
+    case "Pickup in store":
+      return "매장수령";
+    default:
+      return method;
+  }
+};
+
 export const OrderList = () => {
   const { event_id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const initialFilters = {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState({
     search: "",
     status: "",
     order_date_from: null,
     order_date_to: null,
     is_temp: false,
     sort: "order_date_desc",
-  };
+    event_name: "",
+  });
 
-  const [filters, setFilters] = useState(initialFilters);
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const {
-    data: eventResponse,
-    isLoading: eventLoading,
-    error: eventError,
-  } = useEventDetails(event_id);
+  const { data: eventResponse, isLoading: eventLoading } = useEventDetails(
+    event_id,
+    {
+      enabled: !!event_id,
+    }
+  );
+
   const {
     data: ordersData,
     isLoading: ordersLoading,
     error: ordersError,
-    refetch,
-  } = useOrders({
-    ...filters,
-    event_id,
-    limit: itemsPerPage,
-    offset: (currentPage - 1) * itemsPerPage,
-    order_date_from: filters.order_date_from || undefined,
-    order_date_to: filters.order_date_to || undefined,
-  });
-  const { data: authorsData, isLoading: authorsLoading } = useAuthors();
-  const { data: affiliationsData, isLoading: affiliationsLoading } =
-    useAffiliations();
+  } = useOrders(
+    {
+      ...filters,
+      limit: itemsPerPage,
+      offset: (currentPage - 1) * itemsPerPage,
+    },
+    {
+      enabled: !!event_id && !!filters.event_name,
+    }
+  );
+
+  const { data: authorsData } = useAuthors();
+  const { data: affiliationsData } = useAffiliations();
   const updateOrderStatusMutation = useUpdateOrderStatus();
+  const downloadOrdersMutation = useDownloadOrders();
 
   const authors = useMemo(
     () =>
@@ -72,27 +103,45 @@ export const OrderList = () => {
     [affiliationsData]
   );
 
+  // event_id 변경 시 필터 초기화
   useEffect(() => {
     if (event_id) {
-      refetch();
+      setCurrentPage(1);
+      setFilters((prev) => ({
+        search: "",
+        status: "",
+        order_date_from: null,
+        order_date_to: null,
+        is_temp: false,
+        sort: "order_date_desc",
+        event_name: prev.event_name,
+      }));
     }
-  }, [event_id, filters, currentPage, refetch]);
+  }, [event_id]);
 
-  const orders = ordersData?.orders || [];
-  const total = ordersData?.total || 0;
-  const eventData = eventResponse;
+  // eventResponse 변경 시 event_name 업데이트
+  useEffect(() => {
+    if (eventResponse?.name) {
+      console.log("Updating event_name from response:", eventResponse.name);
+      setFilters((prev) => ({
+        ...prev,
+        event_name: eventResponse.name,
+      }));
+    }
+  }, [eventResponse]);
 
-  const downloadOrdersMutation = useDownloadOrders();
+  // filters 변경 추적을 위한 디버깅
+  useEffect(() => {
+    console.log("Filters changed:", filters);
+  }, [filters]);
 
   const handleExcelDownload = useCallback(() => {
-    const downloadParams = {
+    downloadOrdersMutation.mutate({
       ...filters,
-      event_id: event_id,
       limit: ordersData?.total || 0,
       offset: 0,
-    };
-    downloadOrdersMutation.mutate(downloadParams);
-  }, [downloadOrdersMutation, filters, event_id, ordersData?.total]);
+    });
+  }, [downloadOrdersMutation, filters, ordersData?.total]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -125,37 +174,21 @@ export const OrderList = () => {
     [updateOrderStatusMutation]
   );
 
-  const handleRowClick = (event, order) => {
-    if (event.target.tagName.toLowerCase() !== "select") {
-      const isAdminRoute = location.pathname.includes("admin");
-      if (isAdminRoute) {
-        navigate(`/admin/order/${order.id}`);
-      } else {
+  const handleRowClick = useCallback(
+    (event, order) => {
+      if (event.target.tagName.toLowerCase() !== "select") {
         navigate(`/event/${event_id}/${order.id}`);
       }
-    }
-  };
+    },
+    [navigate, event_id]
+  );
 
   const handleTabChange = (tabName) => {
-    setFilters({
-      ...initialFilters,
+    setFilters((prev) => ({
+      ...prev,
       is_temp: tabName === "tab2",
-    });
+    }));
     setCurrentPage(1);
-    refetch();
-  };
-
-  const getCollectionMethod = (method) => {
-    switch (method) {
-      case "Delivery":
-        return "배송";
-      case "Pickup on site":
-        return "현장수령";
-      case "Pickup in store":
-        return "매장수령";
-      default:
-        return method;
-    }
   };
 
   const renderTable = (items) => (
@@ -185,22 +218,22 @@ export const OrderList = () => {
         </tr>
       </thead>
       <tbody>
-        {ordersLoading || authorsLoading || affiliationsLoading ? (
+        {ordersLoading ? (
           <tr>
-            <td colSpan="10" className={styles.loadingMessageWrap}>
+            <td colSpan="11" className={styles.loadingMessageWrap}>
               데이터를 불러오는 중입니다...
             </td>
           </tr>
         ) : ordersError ? (
           <tr>
-            <td colSpan="10" className={styles.errorMessageWrap}>
+            <td colSpan="11" className={styles.errorMessageWrap}>
               주문서 데이터를 불러오는 데 실패했습니다.
               {ordersError.message && <p>오류 메시지: {ordersError.message}</p>}
             </td>
           </tr>
         ) : items.length === 0 ? (
           <tr>
-            <td colSpan="10" className={styles.noDataMessageWrap}>
+            <td colSpan="11" className={styles.noDataMessageWrap}>
               조회된 주문서가 없습니다.
             </td>
           </tr>
@@ -211,21 +244,22 @@ export const OrderList = () => {
               onClick={(event) => handleRowClick(event, order)}
               className={styles.orderLink}
             >
-              <td>{authors[order.author_id] || order.author_id}</td>
-              <td>{order.groomName}</td>
-              <td>{order.brideName}</td>
+              <td>{authors[order.author_id] || order.author_id || "-"}</td>
+              <td>{order.groomName || "-"}</td>
+              <td>{order.brideName || "-"}</td>
               <td>
-                {affiliations[order.affiliation_id] || order.affiliation_id}
+                {affiliations[order.affiliation_id] ||
+                  order.affiliation_id ||
+                  "-"}
               </td>
               <td>{getCollectionMethod(order.collectionMethod)}</td>
               <td>
                 <select
                   name={`order_${order.id}`}
-                  id={`order_${order.id}`}
                   className={styles.orderStatus}
                   value={order.status}
                   onChange={(event) => handleOrderStatusChange(event, order.id)}
-                  onClick={(e) => e.stopPropagation()} // 이벤트 버블링 방지
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <option value="Order Completed">주문완료</option>
                   <option value="Packaging Completed">포장완료</option>
@@ -238,10 +272,10 @@ export const OrderList = () => {
                 </select>
               </td>
               <td>{new Date(order.created_at).toLocaleDateString("ko-KR")}</td>
-              <td>{order.totalPrice}</td>
-              <td>{order.advancePayment}</td>
-              <td>{order.payerName}</td>
-              <td>{order.address}</td>
+              <td>{order.totalPrice || "-"}</td>
+              <td>{order.advancePayment || "-"}</td>
+              <td>{order.payerName || "-"}</td>
+              <td>{order.address || "-"}</td>
             </tr>
           ))
         )}
@@ -259,47 +293,25 @@ export const OrderList = () => {
           <h2 className={styles.tableTitle}>
             {eventLoading
               ? "Loading..."
-              : eventError
+              : !eventResponse
               ? "이벤트 정보를 불러오는데 실패했습니다."
-              : `[${eventData?.name}] 주문서 목록`}
+              : `[${eventResponse.name}] 주문서 목록`}
           </h2>
         </div>
         <Tab defaultActiveTab="tab1" onTabChange={handleTabChange}>
           <Tab.TabPane name="tab1" tab="주문서 목록">
-            <Filter filters={filters} setFilters={setFilters} />
-            <div className={styles.actionButtonsWrap}>
-              <Button
-                label="Excel 저장"
-                className={styles.excelButton}
-                onClick={handleExcelDownload}
-              />
-              <Link
-                to={
-                  location.pathname.includes("admin")
-                    ? `/admin/event/${event_id}/create`
-                    : `/event/${event_id}/create`
-                }
-                className={styles.newOrderLink}
-              >
-                주문서 작성
-              </Link>
-            </div>
-            {renderTable(orders)}
-            <Pagination
-              className={styles.pagination}
-              currentPage={currentPage}
-              totalItems={total}
-              itemsPerPage={itemsPerPage}
-              onPageChange={handlePageChange}
+            <Filter
+              filters={filters}
+              setFilters={setFilters}
+              isAdminPage={false}
+              currentEventName={eventResponse?.name || ""}
             />
-          </Tab.TabPane>
-          <Tab.TabPane name="tab2" tab="임시저장 목록">
-            <Filter filters={filters} setFilters={setFilters} />
             <div className={styles.actionButtonsWrap}>
               <Button
                 label="Excel 저장"
                 className={styles.excelButton}
                 onClick={handleExcelDownload}
+                disabled={downloadOrdersMutation.isLoading}
               />
               <Link
                 to={`/event/${event_id}/create`}
@@ -308,11 +320,41 @@ export const OrderList = () => {
                 주문서 작성
               </Link>
             </div>
-            {renderTable(orders)}
+            {renderTable(ordersData?.orders || [])}
             <Pagination
               className={styles.pagination}
               currentPage={currentPage}
-              totalItems={total}
+              totalItems={ordersData?.total || 0}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+            />
+          </Tab.TabPane>
+          <Tab.TabPane name="tab2" tab="임시저장 목록">
+            <Filter
+              filters={filters}
+              setFilters={setFilters}
+              isAdminPage={false}
+              currentEventName={eventResponse?.name || ""}
+            />
+            <div className={styles.actionButtonsWrap}>
+              <Button
+                label="Excel 저장"
+                className={styles.excelButton}
+                onClick={handleExcelDownload}
+                disabled={downloadOrdersMutation.isLoading}
+              />
+              <Link
+                to={`/event/${event_id}/create`}
+                className={styles.newOrderLink}
+              >
+                주문서 작성
+              </Link>
+            </div>
+            {renderTable(ordersData?.orders || [])}
+            <Pagination
+              className={styles.pagination}
+              currentPage={currentPage}
+              totalItems={ordersData?.total || 0}
               itemsPerPage={itemsPerPage}
               onPageChange={handlePageChange}
             />

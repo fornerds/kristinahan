@@ -5,18 +5,23 @@ import { ReactComponent as RefreshIcon } from "../../asset/icon/refresh.svg";
 import styles from "./Filter.module.css";
 import { useAllEvents } from "../../api/hooks";
 
-const initialFilters = {
-  search: "",
-  status: "",
-  event_name: "",
-  order_date_from: null,
-  order_date_to: null,
-  sort: "order_date_desc",
-  is_temp: false,
-};
-
-export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
+export const Filter = ({
+  filters,
+  setFilters,
+  isAdminPage = false,
+  currentEventName = "",
+}) => {
   const { data: events } = useAllEvents();
+
+  const initialFilters = {
+    search: "",
+    status: "",
+    event_name: currentEventName,
+    order_date_from: null,
+    order_date_to: null,
+    sort: "order_date_desc",
+    is_temp: false,
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -29,7 +34,11 @@ export const Filter = ({ filters, setFilters, isAdminPage = false }) => {
   };
 
   const handleReset = () => {
-    setFilters((prev) => ({ ...initialFilters, is_temp: prev.is_temp }));
+    setFilters((prev) => ({
+      ...initialFilters,
+      is_temp: prev.is_temp,
+      event_name: isAdminPage ? prev.event_name : currentEventName,
+    }));
   };
 
   return (
