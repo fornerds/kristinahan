@@ -74,12 +74,13 @@ export const useCurrentEvents = () => {
   });
 };
 
-export const useEventDetails = (eventId) => {
+export const useEventDetails = (eventId, options) => {
   return useQuery(["event", eventId], () => api.getEventDetails(eventId), {
     enabled: !!eventId,
     onError: handleApiError,
     select: (data) => data.data,
     staleTime: 30000,
+    ...options, // 이 부분이 없을 수 있습니다
   });
 };
 
@@ -234,6 +235,18 @@ export const useSaveOrder = () => {
       },
     }
   );
+};
+
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation((orderId) => api.deleteOrder(orderId), {
+    onError: handleApiError,
+    onSuccess: () => {
+      queryClient.invalidateQueries("orders");
+      alert("주문서가 성공적으로 삭제되었습니다.");
+    },
+  });
 };
 
 export const useDownloadOrders = () => {
@@ -625,22 +638,40 @@ export const useUpdateForm = () => {
   );
 };
 
-// Fast API에 없음
-// export const useDeleteForm = () => {
-//   const queryClient = useQueryClient();
+export const useDeleteForm = () => {
+  const queryClient = useQueryClient();
 
-//   return useMutation((formId) => api.deleteForm(formId), {
-//     onSuccess: () => {
-//       queryClient.invalidateQueries("forms");
-//       alert("주문서 양식이 성공적으로 삭제되었습니다.");
-//     },
-//     onError: (error) => {
-//       console.error("Delete form error:", error);
-//       const errorMessage = error.response?.data?.detail || error.message;
-//       alert(`주문서 양식 삭제에 실패했습니다: ${errorMessage}`);
-//     },
-//   });
-// };
+  return useMutation((formId) => api.deleteForm(formId), {
+    onError: handleApiError,
+    onSuccess: () => {
+      queryClient.invalidateQueries("forms");
+      alert("주문서 양식이 성공적으로 삭제되었습니다.");
+    },
+    onMutate: async (formId) => {
+      // 이전 쿼리 취소
+      await queryClient.cancelQueries("forms");
+
+      // 이전 데이터 스냅샷 저장
+      const previousForms = queryClient.getQueryData("forms");
+
+      // 낙관적 업데이트
+      if (previousForms) {
+        queryClient.setQueryData("forms", (old) =>
+          old.filter((form) => form.id !== formId)
+        );
+      }
+
+      return { previousForms };
+    },
+    onError: (err, formId, context) => {
+      // 에러 발생 시 이전 데이터로 롤백
+      if (context?.previousForms) {
+        queryClient.setQueryData("forms", context.previousForms);
+      }
+      handleApiError(err);
+    },
+  });
+};
 
 export const useDuplicateForm = () => {
   const queryClient = useQueryClient();

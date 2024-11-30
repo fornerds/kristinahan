@@ -135,6 +135,8 @@ export const saveOrder = (orderData, orderId = null, isTemp = false) => {
 export const updateOrderStatus = (orderId, status) =>
   api.put(`/orders/${orderId}/${status}`);
 
+export const deleteOrder = (orderId) => api.delete(`/order/${orderId}`);
+
 export const downloadOrders = (params) =>
   api.get("/orders/download", {
     params,
@@ -188,8 +190,7 @@ export const createForm = (formData) => api.post("/forms", formData);
 export const updateForm = (formId, formData) =>
   api.put(`/forms/${formId}`, formData);
 
-// Fast API에 없음
-// export const deleteForm = (formId) => api.delete(`/forms/${formId}`);
+export const deleteForm = (formId) => api.delete(`/forms/${formId}`);
 
 export const duplicateForm = (formId) => api.post(`/forms/${formId}/duplicate`);
 
