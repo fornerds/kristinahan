@@ -8,6 +8,7 @@ import {
   useFormDetails,
   useUpdateForm,
   useCategories,
+  useDeleteForm,
 } from "../../../../api/hooks";
 
 export const OrderForm = () => {
@@ -17,9 +18,11 @@ export const OrderForm = () => {
   const { data: allCategories, isLoading: isCategoriesLoading } =
     useCategories();
   const updateFormMutation = useUpdateForm();
+  const deleteFormMutation = useDeleteForm();
 
   const [formName, setFormName] = useState("");
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [repairs, setRepairs] = useState([]);
   const [modalInfo, setModalInfo] = useState({
     isOpen: false,
@@ -147,6 +150,24 @@ export const OrderForm = () => {
           "주문서 양식 수정에 실패했습니다: " +
           (error.response?.data?.detail || error.message),
       });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteFormMutation.mutateAsync(orderform_id);
+      // 성공 시 목록 페이지로 이동
+      navigate("/admin/orderform");
+    } catch (error) {
+      setModalInfo({
+        isOpen: true,
+        title: "오류",
+        message:
+          "주문서 양식 삭제에 실패했습니다: " +
+          (error.response?.data?.detail || error.message),
+      });
+    } finally {
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -324,6 +345,12 @@ export const OrderForm = () => {
                   label="저장"
                   className={styles.saveButton}
                 />
+                <Button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  label="삭제"
+                  variant="danger"
+                  className={styles.deleteButton}
+                />
               </div>
             </div>
           </>
@@ -334,6 +361,16 @@ export const OrderForm = () => {
         onClose={closeModal}
         title={modalInfo.title}
         message={modalInfo.message}
+      />
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="주문서 양식 삭제"
+        message="정말로 이 주문서 양식을 삭제하시겠습니까?"
+        confirmLabel="삭제"
+        onConfirm={handleDelete}
+        cancelLabel="취소"
+        onCancel={() => setShowDeleteConfirm(false)}
       />
     </div>
   );
