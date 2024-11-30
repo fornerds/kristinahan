@@ -140,6 +140,7 @@ export const OrderForm = () => {
         formData: formData,
       });
 
+      alert("주문서 양식이 정상적으로 수정되었습니다.");
       navigate("/admin/orderform");
     } catch (error) {
       console.error("Update form error:", error);
