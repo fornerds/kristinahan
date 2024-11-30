@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import styles from "./CurrencyInput.module.css";
 
@@ -9,188 +9,129 @@ export const CurrencyInput = React.memo(
     onChange,
     initialCurrency,
     initialAmount,
+    initialConvertedAmount = 0,
     allowNull,
   }) => {
+    const [amount, setAmount] = useState(initialAmount);
     const [currency, setCurrency] = useState(
       initialCurrency || (allowNull ? null : currencies[0])
     );
-    const [amount, setAmount] = useState(
-      initialAmount !== undefined ? initialAmount : allowNull ? null : 0
+    const [convertedAmount, setConvertedAmount] = useState(
+      initialConvertedAmount
     );
-    const [exchangeRates, setExchangeRates] = useState({
-      KRW: 1,
-      JPY: 1,
-      USD: 1,
-    });
-    const [goldPrices, setGoldPrices] = useState({
-      "10K": 1,
-      "14K": 1,
-      "18K": 1,
-      "24K": 1,
-    });
     const [isLoading, setIsLoading] = useState(false);
 
-    // 환율 정보 가져오기
-    const fetchExchangeRates = async (date) => {
-      try {
-        const response = await axios.get(
-          `https://kristinahan-db64be049567.herokuapp.com/getExchangeRateInfo?search_date=${date}`
-        );
-        const rates = response.data.items.reduce(
-          (acc, item) => {
-            const convertToNumber = (value) => {
-              if (typeof value === "string") {
-                return parseFloat(value.replace(/,/g, ""));
-              }
-              return parseFloat(value);
-            };
-
-            if (item.cur_unit === "JPY(100)") {
-              acc["JPY"] = convertToNumber(item.deal_bas_r) / 100; // 100엔당 가격을 1엔당 가격으로 변환
-            } else if (item.cur_unit === "USD") {
-              acc[item.cur_unit] = convertToNumber(item.deal_bas_r);
-            }
-            return acc;
-          },
-          {
-            KRW: 1, // KRW는 항상 1로 고정
-          }
-        );
-        return rates;
-      } catch (error) {
-        console.error("Failed to fetch exchange rates:", error);
-        return null;
-      }
-    };
-
-    // 금 시세 정보 가져오기
-    const fetchGoldPrices = async (date) => {
-      try {
-        const response = await axios.get(
-          `https://kristinahan-db64be049567.herokuapp.com/getGoldPriceInfo?page_no=1&num_of_rows=1&result_type=json&bas_dt=${date}`
-        );
-        const goldPrices = response.data.items[0];
-
-        const convertToNumber = (value) => {
-          if (typeof value === "string") {
-            return parseFloat(value.replace(/,/g, ""));
-          }
-          return parseFloat(value);
-        };
-
-        return {
-          "10K": convertToNumber(goldPrices.gold_10k),
-          "14K": convertToNumber(goldPrices.gold_14k),
-          "18K": convertToNumber(goldPrices.gold_18k),
-          "24K": convertToNumber(goldPrices.gold_24k),
-        };
-      } catch (error) {
-        console.error("Failed to fetch gold prices:", error);
-        return null;
-      }
-    };
-
-    const fetchRates = async () => {
-      setIsLoading(true);
-      try {
-        const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
-        const [rates, gold] = await Promise.all([
-          fetchExchangeRates(today),
-          fetchGoldPrices(today),
-        ]);
-
-        if (rates) setExchangeRates(rates);
-        if (gold) setGoldPrices(gold);
-
-        // 새로운 환율로 현재 값을 다시 계산
-        if (amount && currency) {
-          const newConvertedAmount = calculateConvertedAmount(
-            amount,
-            currency,
-            rates,
-            gold
-          );
-          onChange(amount, currency, newConvertedAmount);
-        }
-      } catch (error) {
-        console.error("Failed to fetch rates:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    useEffect(() => {
-      if (initialAmount !== undefined || initialCurrency) {
-        const newAmount = initialAmount || 0;
-        const newCurrency = initialCurrency || currencies[0];
-
-        setAmount(newAmount);
-        setCurrency(newCurrency);
-
-        // 환율 정보를 가져온 후 환산액 계산
-        fetchRates().then(() => {
-          const convertedAmount = calculateConvertedAmount(
-            newAmount,
-            newCurrency
-          );
-          onChange(newAmount, newCurrency, convertedAmount);
-        });
-      }
-    }, [initialAmount, initialCurrency]);
-
-    useEffect(() => {
-      fetchRates();
-    }, []); // 컴포넌트 마운트 시 한 번만 실행
-
-    const calculateConvertedAmount = useCallback(
-      (newAmount, newCurrency) => {
-        if (newAmount === null || !newCurrency) return 0;
-        if (["10K", "14K", "18K", "24K"].includes(newCurrency)) {
-          return Math.round(Math.max(0, newAmount) * goldPrices[newCurrency]);
-        } else {
-          return Math.round(
-            Math.max(0, newAmount) * exchangeRates[newCurrency]
-          );
-        }
-      },
-      [exchangeRates, goldPrices]
-    );
-
-    const handleAmountChange = useCallback(
-      (e) => {
-        const inputValue = e.target.value.replace(/[^0-9.]/g, "");
-
-        if (inputValue === "") {
-          setAmount(0);
-          const convertedAmount = calculateConvertedAmount(0, currency);
-          onChange(0, currency, convertedAmount);
+    const fetchAndCalculateRate = useCallback(
+      async (newAmount, newCurrency) => {
+        if (!newAmount || !newCurrency) {
+          setConvertedAmount(0);
+          onChange(newAmount || 0, newCurrency, 0);
           return;
         }
 
-        const newAmount = parseFloat(inputValue);
-        if (!isNaN(newAmount)) {
-          setAmount(newAmount);
-          const convertedAmount = calculateConvertedAmount(newAmount, currency);
-          onChange(newAmount, currency, convertedAmount);
+        setIsLoading(true);
+        try {
+          let rate;
+
+          if (["10K", "14K", "18K", "24K"].includes(newCurrency)) {
+            const response = await axios.get(
+              `https://kristinahan-db64be049567.herokuapp.com/getGoldPriceInfo?page_no=1&num_of_rows=1&result_type=json&bas_dt=${new Date()
+                .toISOString()
+                .split("T")[0]
+                .replace(/-/g, "")}`
+            );
+            const goldPrices = response.data.items[0];
+            const priceKey = `gold_${newCurrency.toLowerCase()}`;
+            rate = Number(goldPrices[priceKey]) || 0;
+          } else {
+            const response = await axios.get(
+              `https://kristinahan-db64be049567.herokuapp.com/getExchangeRateInfo?search_date=${new Date()
+                .toISOString()
+                .split("T")[0]
+                .replace(/-/g, "")}`
+            );
+
+            rate = response.data.items.reduce(
+              (acc, item) => {
+                if (!item || !item.cur_unit) return acc;
+                if (item.cur_unit === "JPY(100)" && newCurrency === "JPY") {
+                  return Number(item.deal_bas_r) / 100;
+                }
+                if (item.cur_unit === newCurrency) {
+                  return Number(item.deal_bas_r);
+                }
+                return acc;
+              },
+              newCurrency === "KRW" ? 1 : 0
+            );
+          }
+
+          const newConvertedAmount = Math.round(Number(newAmount) * rate);
+
+          console.log(`${label} conversion:`, {
+            amount: newAmount,
+            currency: newCurrency,
+            convertedAmount: newConvertedAmount,
+          });
+
+          setConvertedAmount(newConvertedAmount);
+          onChange(newAmount, newCurrency, newConvertedAmount);
+        } catch (error) {
+          console.error("Failed to fetch rates:", error);
+        } finally {
+          setIsLoading(false);
         }
       },
-      [currency, onChange, calculateConvertedAmount]
+      [onChange, label]
+    );
+
+    useEffect(() => {
+      if (initialCurrency && typeof initialAmount !== "undefined") {
+        setCurrency(initialCurrency);
+        setAmount(initialAmount);
+        setConvertedAmount(initialConvertedAmount);
+      }
+    }, [initialCurrency, initialAmount, initialConvertedAmount]);
+
+    const handleAmountChange = useCallback(
+      (e) => {
+        const inputValue = e.target.value;
+        const numericValue = inputValue.replace(/[^0-9]/g, "");
+
+        // 입력값이 비어있을 때
+        if (inputValue === "") {
+          setAmount("");
+          if (currency) {
+            fetchAndCalculateRate(0, currency);
+          }
+          return;
+        }
+
+        // 숫자로 변환
+        const newAmount = parseInt(numericValue, 10);
+        setAmount(newAmount);
+
+        if (currency) {
+          fetchAndCalculateRate(newAmount, currency);
+        }
+      },
+      [currency, fetchAndCalculateRate]
     );
 
     const handleCurrencyChange = useCallback(
-      async (e) => {
+      (e) => {
         const newCurrency = e.target.value || null;
         setCurrency(newCurrency);
 
-        // 통화가 변경되면 환율 정보를 새로 가져옴
-        if (newCurrency && newCurrency !== currency) {
-          await fetchRates();
+        const currentAmount = amount || 0;
+        if (newCurrency) {
+          fetchAndCalculateRate(currentAmount, newCurrency);
+        } else {
+          setConvertedAmount(0);
+          onChange(currentAmount, newCurrency, 0);
         }
-
-        const convertedAmount = calculateConvertedAmount(amount, newCurrency);
-        onChange(amount, newCurrency, convertedAmount);
       },
-      [amount, currency, onChange, calculateConvertedAmount]
+      [amount, fetchAndCalculateRate, onChange]
     );
 
     return (
@@ -218,7 +159,7 @@ export const CurrencyInput = React.memo(
             className={`${styles.currencyInput} ${
               isLoading ? styles.loading : ""
             }`}
-            value={amount !== null ? amount : ""}
+            value={amount}
             onChange={handleAmountChange}
             disabled={isLoading}
           />
@@ -229,9 +170,7 @@ export const CurrencyInput = React.memo(
               환율 정보를 가져오는 중...
             </span>
           ) : (
-            <span>
-              {calculateConvertedAmount(amount, currency).toLocaleString()} 원
-            </span>
+            <span>{convertedAmount?.toLocaleString()} 원</span>
           )}
         </td>
       </tr>

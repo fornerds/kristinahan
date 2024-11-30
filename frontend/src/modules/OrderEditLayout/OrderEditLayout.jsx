@@ -9,6 +9,7 @@ import {
   useOrderDetails,
   useSaveOrder,
   useEventDetails,
+  useDeleteOrder,
 } from "../../api/hooks";
 
 export const OrderEditLayout = () => {
@@ -19,6 +20,8 @@ export const OrderEditLayout = () => {
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const printableAreaRef = useRef(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const deleteOrderMutation = useDeleteOrder();
 
   // API hooks
   const { data: orderData, isLoading: isLoadingOrder } =
@@ -59,6 +62,20 @@ export const OrderEditLayout = () => {
       console.error("Failed to save order:", error);
       setErrorMessage(
         error.response?.data?.message || "주문서 저장 중 오류가 발생했습니다."
+      );
+      setIsErrorModalOpen(true);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteOrderMutation.mutateAsync(order_id);
+      setIsDeleteModalOpen(false);
+      navigate(backLink);
+    } catch (error) {
+      console.error("Failed to delete order:", error);
+      setErrorMessage(
+        error.response?.data?.message || "주문서 삭제 중 오류가 발생했습니다."
       );
       setIsErrorModalOpen(true);
     }
@@ -138,6 +155,12 @@ export const OrderEditLayout = () => {
             onClick={handlePrint}
           />
           <Button
+            label="삭제하기"
+            className={styles.actionButton}
+            variant="danger"
+            onClick={() => setIsDeleteModalOpen(true)}
+          />
+          <Button
             label="수정하기"
             className={styles.actionButton}
             onClick={() => handleSave(false)}
@@ -165,6 +188,17 @@ export const OrderEditLayout = () => {
         message={errorMessage}
         confirmLabel="확인"
         onConfirm={() => setIsErrorModalOpen(false)}
+      />
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="주문서 삭제"
+        message="정말로 이 주문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        confirmLabel="삭제"
+        cancelLabel="취소"
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        variant="danger"
       />
     </div>
   );

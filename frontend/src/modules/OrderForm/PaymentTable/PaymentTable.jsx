@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback } from "react";
 import { CurrencyInput } from "../CurrencyInput";
 import styles from "./PaymentTable.module.css";
 
@@ -9,63 +9,57 @@ const PaymentTable = ({
   isEdit,
   label,
 }) => {
-  const [isDateSelected, setIsDateSelected] = useState(!!payment.payment_date);
-
-  // 초기 데이터 설정을 위한 useEffect
-  useEffect(() => {
-    if (payment) {
-      // 즉시 초기 환산액 계산 및 업데이트
-      const cashConverted = payment.cashConvertedAmount || 0;
-      const cardConverted = payment.cardConvertedAmount || 0;
-      const tradeInConverted = payment.tradeInConvertedAmount || 0;
-
-      const totalConverted = cashConverted + cardConverted + tradeInConverted;
-
-      if (totalConverted !== payment.totalConvertedAmount) {
-        onPaymentChange({
-          ...payment,
-          cashConvertedAmount: cashConverted,
-          cardConvertedAmount: cardConverted,
-          tradeInConvertedAmount: tradeInConverted,
-          totalConvertedAmount: totalConverted,
-        });
-      }
-    }
-  }, [payment]);
-
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
-      const updatedPayment = {
-        ...payment,
-        [`${field}Amount`]: amount !== null ? Number(amount) : 0,
-        [`${field}Currency`]: currency || null,
-        [`${field}ConvertedAmount`]: convertedAmount || 0,
-      };
-
-      // 각 지급 방법별 환산액을 유지하면서 현재 변경된 필드만 업데이트
-      const totalConverted =
-        (field === "cash"
-          ? convertedAmount
-          : payment.cashConvertedAmount || 0) +
-        (field === "card"
-          ? convertedAmount
-          : payment.cardConvertedAmount || 0) +
-        (field === "tradeIn"
-          ? convertedAmount
-          : payment.tradeInConvertedAmount || 0);
-
-      onPaymentChange({
-        ...updatedPayment,
-        totalConvertedAmount: totalConverted,
-        paymentMethod: payment.paymentMethod,
+      console.log(`${field} payment changed:`, {
+        amount,
+        currency,
+        convertedAmount,
       });
+
+      const updatedPayment = { ...payment };
+
+      // field에 따라 해당하는 결제 수단만 업데이트
+      if (field === "cash") {
+        if (amount > 0 && currency) {
+          updatedPayment.cashAmount = amount;
+          updatedPayment.cashCurrency = currency;
+          updatedPayment.cashConversion = convertedAmount;
+        } else {
+          updatedPayment.cashAmount = null;
+          updatedPayment.cashCurrency = null;
+          updatedPayment.cashConversion = null;
+        }
+      } else if (field === "card") {
+        if (amount > 0 && currency) {
+          updatedPayment.cardAmount = amount;
+          updatedPayment.cardCurrency = currency;
+          updatedPayment.cardConversion = convertedAmount;
+        } else {
+          updatedPayment.cardAmount = null;
+          updatedPayment.cardCurrency = null;
+          updatedPayment.cardConversion = null;
+        }
+      } else if (field === "tradeIn") {
+        if (amount > 0 && currency) {
+          updatedPayment.tradeInAmount = amount;
+          updatedPayment.tradeInCurrency = currency;
+          updatedPayment.tradeInConversion = convertedAmount;
+        } else {
+          updatedPayment.tradeInAmount = null;
+          updatedPayment.tradeInCurrency = null;
+          updatedPayment.tradeInConversion = null;
+        }
+      }
+
+      console.log("Updated payment:", updatedPayment);
+      onPaymentChange(updatedPayment);
     },
-    [onPaymentChange, payment]
+    [payment, onPaymentChange]
   );
 
   const handleDateChange = (e) => {
     const date = e.target.value ? new Date(e.target.value) : null;
-    setIsDateSelected(!!date);
     onPaymentChange({
       ...payment,
       payment_date: date ? date.toISOString() : null,
@@ -122,30 +116,28 @@ const PaymentTable = ({
             label="현금"
             currencies={["KRW", "JPY", "USD"]}
             onChange={handleCurrencyChange("cash")}
-            initialCurrency={payment.cashCurrency || "KRW"}
-            initialAmount={payment.cashAmount || 0}
+            initialCurrency={payment.cashCurrency}
+            initialAmount={payment.cashAmount}
+            initialConvertedAmount={payment.cashConversion}
             allowNull={false}
-            key={`cash-${payment.cashAmount}-${payment.cashCurrency}`} // 키 추가
           />
-
           <CurrencyInput
             label="카드"
             currencies={["KRW", "JPY", "USD"]}
             onChange={handleCurrencyChange("card")}
-            initialCurrency={payment.cardCurrency || "KRW"}
-            initialAmount={payment.cardAmount || 0}
+            initialCurrency={payment.cardCurrency}
+            initialAmount={payment.cardAmount}
+            initialConvertedAmount={payment.cardConversion}
             allowNull={false}
-            key={`card-${payment.cardAmount}-${payment.cardCurrency}`} // 키 추가
           />
-
           <CurrencyInput
             label="보상판매"
             currencies={["10K", "14K", "18K", "24K"]}
             onChange={handleCurrencyChange("tradeIn")}
             initialCurrency={payment.tradeInCurrency}
-            initialAmount={payment.tradeInAmount || 0}
+            initialAmount={payment.tradeInAmount}
+            initialConvertedAmount={payment.tradeInConversion}
             allowNull={true}
-            key={`tradeIn-${payment.tradeInAmount}-${payment.tradeInCurrency}`} // 키 추가
           />
         </tbody>
       </table>

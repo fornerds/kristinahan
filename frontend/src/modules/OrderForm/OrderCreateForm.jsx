@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Button, Input } from "../../components";
 import PaymentTable from "./PaymentTable/PaymentTable";
 import { Modal } from "../Modal";
 import styles from "./OrderForm.module.css";
 import {
-  useSaveOrder,
   useOrderDetails,
   useAuthors,
   useAffiliations,
   useEventDetails,
   useCategories,
+  useSaveOrder,
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
-  Order_Completed: "주문완료",
-  Packaging_Completed: "포장완료",
-  Repair_Received: "수선접수",
-  Repair_Completed: "수선완료",
-  In_delivery: "배송중",
-  Delivery_completed: "배송완료",
-  Receipt_completed: "수령완료",
+  "Order Completed": "주문완료",
+  "Packaging Completed": "포장완료",
+  "Repair Received": "수선접수",
+  "Repair Completed": "수선완료",
+  "In delivery": "배송중",
+  "Delivery completed": "배송완료",
+  "Receipt completed": "수령완료",
   Accommodation: "숙소",
 };
 
@@ -31,18 +31,21 @@ const chunk = (array, size) => {
   return chunked;
 };
 
-export const OrderCreateForm = ({
-  event_id,
-  isEdit,
-  orderId,
-  onSave,
-  onComplete,
-}) => {
+const convertStatusFromApiFormat = (status) => {
+  return status.replace(/_/g, " ");
+};
+
+export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
+  const { data: categories, isLoading: isCategoriesLoading } = useCategories();
+  const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
+  const { data: affiliations, isLoading: isLoadingAffiliations } =
+    useAffiliations();
+  const saveOrderMutation = useSaveOrder();
+
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: null,
-    modifier_id: null,
     affiliation_id: null,
     groomName: "",
     brideName: "",
@@ -50,20 +53,19 @@ export const OrderCreateForm = ({
     address: "",
     collectionMethod: "",
     notes: "",
-    alter_notes: "",
     totalPrice: 0,
     advancePayment: 0,
     balancePayment: 0,
     isTemporary: false,
-    status: "Order_Completed",
-    orderItems: [],
-    alteration_details: [],
+    status: "Order Completed",
+    alteration_details: {
+      notes: "",
+    },
   });
 
   const [selectedProducts, setSelectedProducts] = useState({});
-  const [groupedProducts, setGroupedProducts] = useState({});
+  const [orderCategories, setOrderCategories] = useState([]);
   const [customerName, setCustomerName] = useState("");
-  const [payerName, setPayerName] = useState("");
   const [affiliationError, setAffiliationError] = useState("");
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [prepaymentTotal, setPrepaymentTotal] = useState(0);
@@ -72,66 +74,78 @@ export const OrderCreateForm = ({
   const [payments, setPayments] = useState([
     {
       payment_date: new Date().toISOString(),
-      paymentMethod: "advance",
+      paymentMethod: "ADVANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
+      cashConversion: 0,
       cardAmount: 0,
       cardCurrency: "KRW",
+      cardConversion: 0,
       tradeInAmount: 0,
       tradeInCurrency: "",
+      tradeInConversion: 0,
       notes: "",
-      totalConvertedAmount: 0,
       payerName: "",
-      cashConvertedAmount: 0,
-      cardConvertedAmount: 0,
-      tradeInConvertedAmount: 0,
     },
     {
       payment_date: new Date().toISOString(),
-      paymentMethod: "balance",
+      paymentMethod: "BALANCE",
       cashAmount: 0,
       cashCurrency: "KRW",
+      cashConversion: 0,
       cardAmount: 0,
       cardCurrency: "KRW",
+      cardConversion: 0,
       tradeInAmount: 0,
       tradeInCurrency: "",
+      tradeInConversion: 0,
       notes: "",
-      totalConvertedAmount: 0,
       payerName: "",
-      cashConvertedAmount: 0,
-      cardConvertedAmount: 0,
-      tradeInConvertedAmount: 0,
     },
   ]);
 
-  // API hooks
-  const { mutateAsync: saveOrder } = useSaveOrder();
-  const { data: categories, isLoading: isCategoriesLoading } = useCategories();
-  const { data: authors, isLoading: isLoadingAuthors } = useAuthors();
-  const { data: affiliations, isLoading: isLoadingAffiliations } =
-    useAffiliations();
+  // useMemo hooks
+  const groupedProducts = useMemo(() => {
+    if (!categories || !event) return {};
+    const newGroupedProducts = {};
+    orderCategories.forEach((category) => {
+      newGroupedProducts[category.id] = category.products;
+    });
+    return newGroupedProducts;
+  }, [categories, event, orderCategories]);
 
-  console.log("event", JSON.stringify(event));
-  console.log("categories", categories);
+  // Effects
+  useEffect(() => {
+    if (event && categories) {
+      const filteredCategories = categories.filter((category) =>
+        event.form.categories.some(
+          (formCategory) => formCategory.id === category.id
+        )
+      );
+      setOrderCategories(filteredCategories);
+    }
+  }, [event, categories]);
 
   useEffect(() => {
-    if (event && categories && !isEdit) {
-      const newGroupedProducts = {};
-      event.form.categories.forEach((eventCategory) => {
-        const category = categories.find((c) => c.id === eventCategory.id);
-        if (category) {
-          newGroupedProducts[category.id] = category.products;
-        }
-      });
-      setGroupedProducts(newGroupedProducts);
-    }
-  }, [event, categories, isEdit]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const newTotalPrice = Object.values(selectedProducts).reduce(
+      (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+      0
+    );
+    setTotalPrice(newTotalPrice);
     setFormData((prev) => ({
       ...prev,
-      [name]: value ? parseInt(value, 10) : null,
+      totalPrice: newTotalPrice,
+      advancePayment: prepaymentTotal,
+      balancePayment: balanceTotal,
+    }));
+  }, [selectedProducts, prepaymentTotal, balanceTotal]);
+
+  // Handlers
+  const handleAuthorChange = (e) => {
+    const { value } = e.target;
+    setFormData((prevFormData) => ({
+      ...prevFormData,
+      author_id: value ? parseInt(value, 10) : null,
     }));
   };
 
@@ -148,10 +162,6 @@ export const OrderCreateForm = ({
     }
     setAffiliationError("");
     return true;
-  };
-
-  const closeErrorModal = () => {
-    setIsErrorModalOpen(false);
   };
 
   const handleAffiliationChange = (e) => {
@@ -177,83 +187,6 @@ export const OrderCreateForm = ({
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
-  const handlePaymentChange = useCallback(
-    (index) => (updatedPayment) => {
-      // 각 지급 방법별 환산액 계산
-      const cashConverted = updatedPayment.cashConvertedAmount || 0;
-      const cardConverted = updatedPayment.cardConvertedAmount || 0;
-      const tradeInConverted = updatedPayment.tradeInConvertedAmount || 0;
-
-      // 원화환산액 총액 계산
-      const totalConverted = cashConverted + cardConverted + tradeInConverted;
-
-      // payments 상태 업데이트
-      setPayments((prev) => {
-        const newPayments = [...prev];
-        newPayments[index] = {
-          ...updatedPayment,
-          paymentMethod: index === 0 ? "advance" : "balance",
-          payment_date: updatedPayment.payment_date || new Date().toISOString(),
-          totalConvertedAmount: totalConverted,
-          payer: updatedPayment.payerName || null,
-        };
-        return newPayments;
-      });
-
-      // 선입금/잔금 총액 업데이트
-      if (index === 0) {
-        setPrepaymentTotal(totalConverted);
-      } else {
-        setBalanceTotal(totalConverted);
-      }
-    },
-    [formData.groomName]
-  );
-
-  const handleAlterationChange = (repairId, value, field) => {
-    const figure = parseFloat(value);
-    if (isNaN(figure)) return;
-
-    setFormData((prev) => {
-      const newAlterationDetails = [...prev.alteration_details];
-      const existingIndex = newAlterationDetails.findIndex(
-        (detail) => detail.form_repair_id === repairId
-      );
-
-      if (existingIndex !== -1) {
-        if (figure === 0 && field === "figure") {
-          // figure가 0이면 해당 항목 제거
-          newAlterationDetails.splice(existingIndex, 1);
-        } else {
-          // 기존 항목 업데이트
-          newAlterationDetails[existingIndex] = {
-            ...newAlterationDetails[existingIndex],
-            [field]: figure,
-          };
-        }
-      } else if (figure !== 0 || field === "alterationFigure") {
-        // 새로운 항목 추가
-        newAlterationDetails.push({
-          form_repair_id: repairId,
-          figure: field === "figure" ? figure : 0,
-          alterationFigure: field === "alterationFigure" ? figure : 0,
-        });
-      }
-
-      return {
-        ...prev,
-        alteration_details: newAlterationDetails,
-      };
-    });
-  };
-
-  const handleAlterationNotes = (value) => {
-    setFormData((prev) => ({
-      ...prev,
-      alter_notes: value,
-    }));
-  };
-
   const handleGroomNameChange = useCallback((e) => {
     const newGroomName = e.target.value;
     setFormData((prev) => ({ ...prev, groomName: newGroomName }));
@@ -265,23 +198,67 @@ export const OrderCreateForm = ({
     setFormData((prev) => ({ ...prev, brideName: newBrideName }));
   }, []);
 
+  const handlePaymentChange = useCallback(
+    (index) => (updatedPayment) => {
+      setPayments((prev) => {
+        const newPayments = [...prev];
+        const basePayment = {
+          payment_date: updatedPayment.payment_date || new Date().toISOString(),
+          paymentMethod: index === 0 ? "ADVANCE" : "BALANCE",
+          notes: updatedPayment.notes || "",
+          payerName: updatedPayment.payerName || "",
+        };
+
+        if (updatedPayment.cashAmount > 0 && updatedPayment.cashCurrency) {
+          basePayment.cashAmount = updatedPayment.cashAmount;
+          basePayment.cashCurrency = updatedPayment.cashCurrency;
+          basePayment.cashConversion = updatedPayment.cashConversion;
+        }
+
+        if (updatedPayment.cardAmount > 0 && updatedPayment.cardCurrency) {
+          basePayment.cardAmount = updatedPayment.cardAmount;
+          basePayment.cardCurrency = updatedPayment.cardCurrency;
+          basePayment.cardConversion = updatedPayment.cardConversion;
+        }
+
+        if (
+          updatedPayment.tradeInAmount > 0 &&
+          updatedPayment.tradeInCurrency
+        ) {
+          basePayment.tradeInAmount = updatedPayment.tradeInAmount;
+          basePayment.tradeInCurrency = updatedPayment.tradeInCurrency;
+          basePayment.tradeInConversion = updatedPayment.tradeInConversion;
+        }
+
+        newPayments[index] = basePayment;
+        return newPayments;
+      });
+
+      const newTotal =
+        (updatedPayment.cashAmount > 0 ? updatedPayment.cashConversion : 0) +
+        (updatedPayment.cardAmount > 0 ? updatedPayment.cardConversion : 0) +
+        (updatedPayment.tradeInAmount > 0
+          ? updatedPayment.tradeInConversion
+          : 0);
+
+      if (index === 0) {
+        setPrepaymentTotal(newTotal);
+      } else {
+        setBalanceTotal(newTotal);
+      }
+    },
+    []
+  );
+
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
       setSelectedProducts((prev) => {
-        const newState = {
-          ...prev,
-          [categoryId]: {
-            ...prev[categoryId],
-            [field]: value,
-          },
-        };
-
+        const newState = { ...prev };
         if (field === "productId") {
           const productId = parseInt(value, 10);
           const selectedProduct = groupedProducts[categoryId]?.find(
             (p) => p.id === productId
           );
-
           if (selectedProduct) {
             newState[categoryId] = {
               productId: selectedProduct.id,
@@ -289,77 +266,85 @@ export const OrderCreateForm = ({
               quantity: 1,
               attributes: selectedProduct.attributes.map((attr) => ({
                 id: attr.id,
-                value: attr.value,
+                value: "",
               })),
             };
           } else {
-            newState[categoryId].price = 0;
-            newState[categoryId].quantity = 1;
-            newState[categoryId].attributes = [];
+            newState[categoryId] = {
+              productId: "",
+              price: 0,
+              quantity: 1,
+              attributes: [],
+            };
           }
+        } else if (field === "attributes") {
+          const selectedProduct = groupedProducts[categoryId]?.find(
+            (p) => p.id === newState[categoryId].productId
+          );
+          if (selectedProduct) {
+            const selectedAttributeId = parseInt(value, 10);
+            const selectedAttribute = selectedProduct.attributes.find(
+              (attr) => attr.id === selectedAttributeId
+            );
+            if (selectedAttribute) {
+              newState[categoryId] = {
+                ...newState[categoryId],
+                attributes: [
+                  {
+                    id: selectedAttribute.id,
+                    value: selectedAttribute.value,
+                  },
+                ],
+              };
+            }
+          }
+        } else {
+          newState[categoryId] = {
+            ...newState[categoryId],
+            [field]: value,
+          };
         }
-
         return newState;
       });
     },
     [groupedProducts]
   );
 
-  useEffect(() => {
-    const newTotalPrice = Object.values(selectedProducts).reduce(
-      (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
-      0
-    );
-    setTotalPrice(newTotalPrice);
-    setFormData((prev) => ({
-      ...prev,
-      totalPrice: newTotalPrice,
-      advancePayment: prepaymentTotal,
-      balancePayment: balanceTotal,
-    }));
-  }, [selectedProducts, prepaymentTotal, balanceTotal]);
+  const handleAlterationChange = (field, value) => {
+    if (field === "notes") {
+      setFormData((prev) => ({
+        ...prev,
+        alteration_details: {
+          ...prev.alteration_details,
+          notes: value,
+        },
+        alter_notes: value,
+      }));
+    } else {
+      setFormData((prev) => {
+        const currentDetails = { ...prev.alteration_details };
+        const [repairType, fieldType] = field.split("_");
 
-  const handleSubmit = async (isTemp = false) => {
-    if (!validateAffiliation()) {
-      return;
+        if (fieldType === "figure" || fieldType === "alteration") {
+          currentDetails[field] = parseFloat(parseFloat(value).toFixed(1));
+        }
+
+        return {
+          ...prev,
+          alteration_details: currentDetails,
+        };
+      });
     }
+  };
 
+  const prepareOrderData = () => {
     const safeParseInt = (value) => {
       const parsed = parseInt(value, 10);
       return isNaN(parsed) ? null : parsed;
     };
 
-    const validateAlterationDetails = (details) => {
-      return details.every(
-        (detail) =>
-          detail.form_repair_id &&
-          typeof detail.figure === "number" &&
-          typeof detail.alterationFigure === "number"
-      );
-    };
-
-    // handleSubmit 함수 내부에서 사용
-    if (
-      formData.alteration_details.length > 0 &&
-      !validateAlterationDetails(formData.alteration_details)
-    ) {
-      alert("수선 정보를 올바르게 입력해주세요.");
-      return;
-    }
-
-    const orderItems = Object.entries(selectedProducts)
-      .map(([categoryId, item]) => {
-        if (!item.productId) return null;
-        return {
-          product_id: safeParseInt(item.productId),
-          attributes_id: item.attributes[0]?.id || null,
-          quantity: safeParseInt(item.quantity) || 0,
-          price: (item.price || 0) * (item.quantity || 0),
-        };
-      })
-      .filter(Boolean);
-
     const convertTradeInCurrency = (currency) => {
+      if (!currency) return null;
       const currencyMap = {
         "10K": "K10",
         "14K": "K14",
@@ -369,42 +354,67 @@ export const OrderCreateForm = ({
       return currencyMap[currency] || currency;
     };
 
+    const orderItems = Object.values(selectedProducts)
+      .filter((item) => item.productId)
+      .map((item) => ({
+        product_id: safeParseInt(item.productId),
+        attributes_id:
+          item.attributes && item.attributes.length > 0
+            ? safeParseInt(item.attributes[0].id)
+            : null,
+        quantity: safeParseInt(item.quantity) || 0,
+        price: (item.price || 0) * (safeParseInt(item.quantity) || 0),
+      }));
+
     const paymentsData = payments.map((payment) => {
       const basePayment = {
-        payer: payment.payerName,
+        payer: payment.payerName || formData.groomName,
         payment_date: payment.payment_date,
-        paymentMethod: payment.paymentMethod,
+        paymentMethod: payment.paymentMethod.toLowerCase(),
         notes: payment.notes || "",
       };
 
       if (payment.cashAmount && payment.cashAmount > 0) {
-        basePayment.cashAmount = safeParseInt(payment.cashAmount);
+        basePayment.cashAmount = payment.cashAmount;
         basePayment.cashCurrency = payment.cashCurrency;
-        basePayment.cashConvertedAmount = payment.cashConvertedAmount;
+        basePayment.cashConversion = payment.cashConversion;
       }
 
       if (payment.cardAmount && payment.cardAmount > 0) {
-        basePayment.cardAmount = safeParseInt(payment.cardAmount);
+        basePayment.cardAmount = payment.cardAmount;
         basePayment.cardCurrency = payment.cardCurrency;
-        basePayment.cardConvertedAmount = payment.cardConvertedAmount;
+        basePayment.cardConversion = payment.cardConversion;
       }
 
       if (payment.tradeInAmount && payment.tradeInAmount > 0) {
-        basePayment.tradeInAmount = safeParseInt(payment.tradeInAmount);
+        basePayment.tradeInAmount = payment.tradeInAmount;
         basePayment.tradeInCurrency = convertTradeInCurrency(
           payment.tradeInCurrency
         );
-        basePayment.tradeInConvertedAmount = payment.tradeInConvertedAmount;
+        basePayment.tradeInConversion = payment.tradeInConversion;
       }
-
-      basePayment.totalConvertedAmount = payment.totalConvertedAmount;
 
       return basePayment;
     });
-    const orderData = {
+
+    const alterationDetails = event?.form?.repairs
+      ?.map((repair) => {
+        const figureValue =
+          formData.alteration_details[`${repair.type}_figure`] || 0;
+        const alterationValue =
+          formData.alteration_details[`${repair.type}_alteration`] || 0;
+
+        return {
+          form_repair_id: repair.id,
+          figure: parseFloat(figureValue),
+          alterationFigure: parseFloat(alterationValue),
+        };
+      })
+      .filter((detail) => detail.figure !== 0 || detail.alterationFigure !== 0);
+
+    return {
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
-      modifier_id: null,
       affiliation_id: safeParseInt(formData.affiliation_id),
       status: "Order_Completed",
       groomName: formData.groomName,
@@ -413,25 +423,32 @@ export const OrderCreateForm = ({
       address: formData.address,
       collectionMethod: formData.collectionMethod,
       notes: formData.notes,
-      alter_notes: formData.alter_notes,
-      totalPrice: totalPrice,
+      alter_notes: formData.alteration_details.notes,
+      totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
       orderItems,
       payments: paymentsData,
-      alteration_details: formData.alteration_details,
+      alteration_details: alterationDetails,
     };
+  };
+
+  const handleSubmit = async (isTemp = false) => {
+    if (!validateAffiliation()) {
+      return;
+    }
 
     try {
-      await saveOrder({
+      const orderData = prepareOrderData();
+      await saveOrderMutation.mutateAsync({
         orderData,
         isTemp,
       });
 
       if (isTemp) {
-        onSave();
+        onSave?.();
       } else {
-        onComplete();
+        onComplete?.();
       }
     } catch (error) {
       console.error("Order save failed:", error);
@@ -452,12 +469,11 @@ export const OrderCreateForm = ({
 
   return (
     <>
-      {/* 주문정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>주문정보</h3>
         <div className={styles.sectionValueWrap}>
           <h4 className={styles.sectionLabel}>주문번호</h4>
-          <p className={styles.sectionValue}>{formData.id || "새 주문"}</p>
+          <p className={styles.sectionValue}>새 주문</p>
         </div>
 
         <div className={styles.sectionGroupWrap}>
@@ -466,7 +482,7 @@ export const OrderCreateForm = ({
             <select
               name="author_id"
               id={styles.writer}
-              onChange={handleInputChange}
+              onChange={handleAuthorChange}
               value={formData.author_id || ""}
             >
               <option value="">작성자 선택</option>
@@ -486,7 +502,6 @@ export const OrderCreateForm = ({
         </div>
       </section>
 
-      {/* 주문자정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>주문자정보</h3>
         <div className={styles.sectionGroupWrap}>
@@ -577,7 +592,6 @@ export const OrderCreateForm = ({
         </div>
       </section>
 
-      {/* 상품정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>상품정보</h3>
         <table className={styles.table}>
@@ -591,103 +605,82 @@ export const OrderCreateForm = ({
             </tr>
           </thead>
           <tbody>
-            {event?.form.categories.map((category) => (
-              <tr key={category.id}>
-                <td>{category.name}</td>
-                <td>
-                  <select
-                    value={selectedProducts[category.id]?.productId || ""}
-                    onChange={(e) =>
-                      handleProductChange(
-                        category.id,
-                        "productId",
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option value="">선택</option>
-                    {(groupedProducts[category.id] || []).map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  {selectedProducts[category.id]?.productId && (
+            {orderCategories.map((category) => {
+              const productInfo = selectedProducts[category.id];
+              const selectedProduct = category.products?.find(
+                (p) => p.id === parseInt(productInfo?.productId, 10)
+              );
+              return (
+                <tr key={category.id}>
+                  <td>{category.name}</td>
+                  <td>
                     <select
-                      value={
-                        selectedProducts[category.id]?.attributes?.[0]?.id || ""
-                      }
+                      value={productInfo?.productId || ""}
                       onChange={(e) =>
-                        handleProductChange(category.id, "attributes", [
-                          {
-                            id: parseInt(e.target.value, 10),
-                            value:
-                              groupedProducts[category.id]
-                                ?.find(
-                                  (p) =>
-                                    p.id ===
-                                    parseInt(
-                                      selectedProducts[category.id].productId,
-                                      10
-                                    )
-                                )
-                                ?.attributes?.find(
-                                  (attr) =>
-                                    attr.id === parseInt(e.target.value, 10)
-                                )?.value || "",
-                          },
-                        ])
+                        handleProductChange(
+                          category.id,
+                          "productId",
+                          e.target.value
+                        )
                       }
                     >
                       <option value="">선택</option>
-                      {groupedProducts[category.id]
-                        ?.find(
-                          (p) =>
-                            p.id ===
-                            parseInt(
-                              selectedProducts[category.id].productId,
-                              10
-                            )
-                        )
-                        ?.attributes?.map((attr) => (
+                      {category.products?.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    {productInfo?.productId && (
+                      <select
+                        value={productInfo?.attributes?.[0]?.id || ""}
+                        onChange={(e) =>
+                          handleProductChange(
+                            category.id,
+                            "attributes",
+                            e.target.value
+                          )
+                        }
+                      >
+                        <option value="">선택</option>
+                        {selectedProduct?.attributes?.map((attr) => (
                           <option key={attr.id} value={attr.id}>
                             {attr.value}
                           </option>
                         ))}
-                    </select>
-                  )}
-                </td>
-                <td>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={selectedProducts[category.id]?.quantity || 0}
-                    onChange={(e) =>
-                      handleProductChange(
-                        category.id,
-                        "quantity",
-                        Math.max(0, parseInt(e.target.value, 10) || 0)
-                      )
-                    }
-                    disabled={!selectedProducts[category.id]?.productId}
-                  />
-                </td>
-                <td>
-                  {(
-                    (selectedProducts[category.id]?.price || 0) *
-                    (selectedProducts[category.id]?.quantity || 0)
-                  ).toLocaleString()}{" "}
-                  원
-                </td>
-              </tr>
-            ))}
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={productInfo?.quantity || 0}
+                      onChange={(e) =>
+                        handleProductChange(
+                          category.id,
+                          "quantity",
+                          Math.max(0, parseInt(e.target.value, 10) || 0)
+                        )
+                      }
+                      disabled={!productInfo?.productId}
+                    />
+                  </td>
+                  <td>
+                    {(
+                      (productInfo?.price || 0) * (productInfo?.quantity || 0)
+                    ).toLocaleString()}{" "}
+                    원
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
 
-      {/* 결제정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>결제정보</h3>
         <PaymentTable
@@ -729,100 +722,86 @@ export const OrderCreateForm = ({
         </div>
       </section>
 
-      {/* 수선정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>수선정보</h3>
         {event?.form?.repairs &&
           chunk(event.form.repairs, 3).map((repairGroup, groupIndex) => (
             <div key={groupIndex} className={styles.sectionGroupWrap}>
-              {repairGroup.map((repair) => {
-                const alterationDetail = formData.alteration_details.find(
-                  (detail) => detail.form_repair_id === repair.id
-                );
-                return (
-                  <div key={repair.id} className={styles.sectionVerticalGroup}>
-                    <h4 className={styles.sectionLabel}>
-                      {repair.information}
-                    </h4>
-                    <div className={styles.alterationInputGroup}>
-                      {/* 최종 길이 입력 필드 */}
-                      <div className={styles.inputWrapper}>
-                        <label className={styles.inputLabel}>최종 길이</label>
-                        <div className={styles.sectionGroup}>
-                          <input
-                            type="number"
-                            className={styles.numberInput}
-                            step="0.1"
-                            min="0"
-                            value={(alterationDetail?.figure || 0).toFixed(1)}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value === "" || isNaN(value)) {
-                                handleAlterationChange(repair.id, 0, "figure");
-                                return;
-                              }
-                              const numValue = parseFloat(
-                                parseFloat(value).toFixed(1)
-                              );
+              {repairGroup.map((repair) => (
+                <div key={repair.id} className={styles.sectionVerticalGroup}>
+                  <h4 className={styles.sectionLabel}>{repair.information}</h4>
+                  <div className={styles.alterationInputGroup}>
+                    <div className={styles.inputWrapper}>
+                      <label className={styles.inputLabel}>최종 길이</label>
+                      <div className={styles.sectionGroup}>
+                        <input
+                          type="number"
+                          className={styles.numberInput}
+                          step="0.1"
+                          min="0"
+                          value={(
+                            formData.alteration_details[
+                              `${repair.type}_figure`
+                            ] || 0
+                          ).toFixed(1)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || isNaN(value)) {
                               handleAlterationChange(
-                                repair.id,
-                                numValue,
-                                "figure"
+                                `${repair.type}_figure`,
+                                0
                               );
-                            }}
-                            onKeyPress={(e) => {
-                              if (!/[\d.-]/.test(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                          />
-                          {repair.unit}
-                        </div>
+                              return;
+                            }
+                            const numValue = parseFloat(
+                              parseFloat(value).toFixed(1)
+                            );
+                            handleAlterationChange(
+                              `${repair.type}_figure`,
+                              numValue
+                            );
+                          }}
+                        />
+                        {repair.unit}
                       </div>
+                    </div>
 
-                      {/* 수선해야 될 길이 입력 필드 */}
-                      <div className={styles.inputWrapper}>
-                        <label className={styles.inputLabel}>수선 길이</label>
-                        <div className={styles.sectionGroup}>
-                          <input
-                            type="number"
-                            className={styles.numberInput}
-                            step="0.1"
-                            value={(
-                              alterationDetail?.alterationFigure || 0
-                            ).toFixed(1)}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value === "" || isNaN(value)) {
-                                handleAlterationChange(
-                                  repair.id,
-                                  0,
-                                  "alterationFigure"
-                                );
-                                return;
-                              }
-                              const numValue = parseFloat(
-                                parseFloat(value).toFixed(1)
-                              );
+                    <div className={styles.inputWrapper}>
+                      <label className={styles.inputLabel}>수선 길이</label>
+                      <div className={styles.sectionGroup}>
+                        <input
+                          type="number"
+                          className={styles.numberInput}
+                          step="0.1"
+                          value={(
+                            formData.alteration_details[
+                              `${repair.type}_alteration`
+                            ] || 0
+                          ).toFixed(1)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || isNaN(value)) {
                               handleAlterationChange(
-                                repair.id,
-                                numValue,
-                                "alterationFigure"
+                                `${repair.type}_alteration`,
+                                0
                               );
-                            }}
-                            onKeyPress={(e) => {
-                              if (!/[\d.-]/.test(e.key)) {
-                                e.preventDefault();
-                              }
-                            }}
-                          />
-                          {repair.unit}
-                        </div>
+                              return;
+                            }
+                            const numValue = parseFloat(
+                              parseFloat(value).toFixed(1)
+                            );
+                            handleAlterationChange(
+                              `${repair.type}_alteration`,
+                              numValue
+                            );
+                          }}
+                        />
+                        {repair.unit}
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ))}
 
@@ -831,8 +810,8 @@ export const OrderCreateForm = ({
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
               className={styles.optionalMessage}
-              value={formData.alter_notes}
-              onChange={(e) => handleAlterationNotes(e.target.value)}
+              value={formData.alteration_details.notes}
+              onChange={(e) => handleAlterationChange("notes", e.target.value)}
             />
           </div>
         </div>
@@ -858,7 +837,7 @@ export const OrderCreateForm = ({
 
       <Modal
         isOpen={isErrorModalOpen}
-        onClose={closeErrorModal}
+        onClose={() => setIsErrorModalOpen(false)}
         title="소속 선택 오류"
         message={affiliationError}
       />
