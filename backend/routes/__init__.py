@@ -8,6 +8,7 @@ from .affiliation_routes import router as affiliation_router
 from .author_routes import router as author_router
 from .category_routes import router as category_router
 from .form_routes import router as form_router
+from .rates_routes import router as rates_router
 
 router = APIRouter()
 
@@ -19,4 +20,5 @@ router.include_router(affiliation_router)
 router.include_router(author_router)
 router.include_router(category_router)
 router.include_router(form_router)
+router.include_router(rates_router)
 
