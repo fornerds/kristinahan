@@ -1,17 +1,14 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
-class AuthorBase(BaseModel):
-    name: str = Field(..., title="Author Name")
+class AuthorResponse(BaseModel):
+    id: int
+    name: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
 
-class AuthorResponse(AuthorBase):
-    id: int = Field(..., title="Author ID")
+class AuthorCreate(BaseModel):
+    name: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
 
-class AuthorCreate(AuthorBase):
-    pass
-
-class AuthorUpdate(AuthorBase):
-    pass
+class AuthorUpdate(BaseModel):
+    name: Optional[str] = None

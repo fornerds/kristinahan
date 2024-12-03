@@ -1,34 +1,35 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-from .product_schema import ProductResponse
-from datetime import datetime
+from pydantic import BaseModel, ConfigDict
+from typing import Optional, List
 
-class CategorySchema(BaseModel):
-    id: int = Field(..., title="Category ID")
-    name: str = Field(..., title="Category Name")
-    created_at: datetime = Field(..., title="Creation Date")
+class AttributeResponse(BaseModel):
+    id: Optional[int] = None  
+    value: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# 카테고리 기본 스키마
-class CategoryBase(BaseModel):
-    name: str = Field(..., title="Category Name")
+class AttributeNumberResponse(BaseModel):
+    id: Optional[int] = None  
+    value: Optional[str] = None
+    indexNumber: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
-# 카테고리 생성 스키마 (created_at을 수동으로 설정하지 않음)
-class CategoryCreate(CategoryBase):
-    products: List[ProductResponse] = Field(..., title="Products in Category")
+class ProductResponse(BaseModel):
+    id: Optional[int] = None  
+    name: Optional[str] = None 
+    price: Optional[float] = None 
+    attributes: Optional[List[AttributeNumberResponse]] = []
 
-# 카테고리 응답 스키마 (created_at을 응답으로만 포함)
-class CategoryResponse(CategoryBase):
-    id: int = Field(..., title="Category ID")
-    created_at: datetime = Field(..., title="Creation Date")  # 응답 시에만 표시
 
-    model_config = ConfigDict(from_attributes=True)
+class CategoryResponse(BaseModel):
+    id: Optional[int] = None  
+    name: Optional[str] = None
 
-# 카테고리 상세 응답 스키마 (상품 포함, created_at 응답)
+
 class CategoryDetailResponse(CategoryResponse):
-    products: List[ProductResponse] = Field(..., title="Products in Category")
+    products: Optional[List[ProductResponse]] = []
 
-    model_config = ConfigDict(from_attributes=True)
+
+class CategoryCreate(BaseModel):
+    name: Optional[str] = None
+    products: Optional[List[ProductResponse]] = []
