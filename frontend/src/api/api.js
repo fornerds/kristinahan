@@ -31,7 +31,9 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      alert("토큰이 만료되었습니다. 다시 로그인해주세요.");
+      alert(
+        "입력한 비밀번호가 다르거나 토큰이 만료되었습니다. 다시 로그인해주세요."
+      );
       localStorage.removeItem("adminToken");
       window.location.href = "/admin/login";
     }
