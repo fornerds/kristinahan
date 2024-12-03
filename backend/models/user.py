@@ -10,6 +10,6 @@ class UserRole(str, Enum):
 class User(Base):
     __tablename__ = 'user'
 
-    id = Column(Integer, primary_key=True, autoincrement=True) 
+    id = Column(Integer, primary_key=True) 
     password = Column(String(255), nullable=False)
     role = Column(SQLAlchemyEnum(UserRole), nullable=False)

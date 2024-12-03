@@ -6,6 +6,6 @@ class Affiliation(Base):
     __tablename__ = 'affiliation'
 
     id = Column(Integer, primary_key=True, autoincrement=True) 
-    name = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=True)
 
     orders = relationship('Order', back_populates='affiliation')

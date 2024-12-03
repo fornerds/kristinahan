@@ -23,15 +23,19 @@ class Payments(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True) 
     order_id = Column(Integer, ForeignKey('order.id'), nullable=False)
-    payment_date = Column(TIMESTAMP, nullable=False)
-    cashAmount = Column(DECIMAL(10, 2), nullable=False)
-    cashCurrency = Column('cashCurrency', SQLAlchemyEnum(CurrencyType), nullable=False)
-    cardAmount = Column(DECIMAL(10, 2), nullable=False)
-    cardCurrency = Column('cardCurrency', SQLAlchemyEnum(CurrencyType), nullable=False)
-    tradeInAmount = Column(DECIMAL(10, 2), nullable=False)
-    tradeInCurrency = Column('tradeInCurrency', SQLAlchemyEnum(TradeInCurrencyType), nullable=False)
+    payer =  Column(String(255), nullable=True)
+    payment_date = Column(TIMESTAMP, nullable=True)
+    cashAmount = Column(DECIMAL(10, 2), nullable=True)
+    cashCurrency = Column('cashCurrency', SQLAlchemyEnum(CurrencyType), nullable=True)
+    cashConversion = Column(DECIMAL(10, 2), nullable=True)
+    cardAmount = Column(DECIMAL(10, 2), nullable=True)
+    cardCurrency = Column('cardCurrency', SQLAlchemyEnum(CurrencyType), nullable=True)
+    cardConversion = Column(DECIMAL(10, 2), nullable=True)
+    tradeInAmount = Column(DECIMAL(10, 2), nullable=True)
+    tradeInCurrency = Column('tradeInCurrency', SQLAlchemyEnum(TradeInCurrencyType), nullable=True)
+    tradeInConversion = Column(DECIMAL(10, 2), nullable=True)
     notes = Column(String, nullable=True)  # TEXT type
-    paymentMethod = Column('paymentMethod', SQLAlchemyEnum(PaymentMethodType), nullable=False)
+    paymentMethod = Column('paymentMethod', SQLAlchemyEnum(PaymentMethodType), nullable=True)
 
     # Relationship
-    order = relationship('Order', back_populates='payments')
+    orders = relationship('Order', back_populates='payments')

@@ -7,7 +7,7 @@ class Attributes(Base):
     __tablename__ = 'attributes'
 
     id = Column(Integer, primary_key=True, autoincrement=True) 
-    value = Column(String(255), nullable=False, unique=True)
+    value = Column(String(255), nullable=True, unique=True)
 
     product_attributes = relationship('ProductAttributes', back_populates='attribute')
     products = relationship('Product', secondary='product_attributes', back_populates='attributes', overlaps="product_attributes")
