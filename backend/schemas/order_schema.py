@@ -47,6 +47,7 @@ class OrderFilterResponse(BaseModel):
     author_id: Optional[int] = None
     modifier_id: Optional[int] = None
     affiliation_id: Optional[int] = None
+    orderNumber: Optional[str] = None
     event_name: Optional[str] = None
     form_name: Optional[str] = None
     orderItems: Optional[List[OrderItemResponse]] = []
@@ -81,6 +82,7 @@ class OrderDetailResponse(BaseModel):
     form: Optional[FormResponse] = None
     orderItems: Optional[List[OrderItemResponse]] = []
     payments: Optional[List[PaymentInfo]] = []
+    orderNumber: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     status: Optional[str] = None

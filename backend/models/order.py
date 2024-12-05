@@ -12,6 +12,7 @@ class OrderStatus(str, Enum):
     Delivery_completed = 'Delivery completed'
     Receipt_completed = 'Receipt completed'
     Accommodation = 'Accommodation'
+    Counsel = 'Counsel'
 
 class Order(Base):
     __tablename__ = 'order'
@@ -21,11 +22,12 @@ class Order(Base):
     author_id = Column(Integer, ForeignKey('author.id'), nullable=True)
     modifier_id = Column(Integer, ForeignKey('author.id'), nullable=True)
     affiliation_id = Column(Integer, ForeignKey('affiliation.id'), nullable=True)
+    orderNumber = Column(String(255), nullable=True)
     created_at = Column(TIMESTAMP, default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
     status = Column(SQLAlchemyEnum(OrderStatus), nullable=True)
-    groomName = Column(String(255), nullable=True)
-    brideName = Column(String(255), nullable=True)
+    groomName = Column(String(50), nullable=True)
+    brideName = Column(String(50), nullable=True)
     contact = Column(String(255), nullable=True)
     address = Column(String(255), nullable=True)
     collectionMethod = Column(String(20), nullable=True)

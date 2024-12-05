@@ -12,9 +12,11 @@ async def get_forms(db: Session = Depends(get_db)):
     forms = db.query(Form).order_by(Form.id.desc()).options(joinedload(Form.form_repairs)).all()
     form_responses = []
     for form in forms:
+        # 카테고리 정보 조회
         categories = db.query(Category).join(FormCategory).filter(FormCategory.form_id == form.id).all()
         category_list = [{"id": category.id, "name": category.name} for category in categories]
         
+        # 수선 정보 정렬 후 조회
         repairs = [
             FormRepairResponse(
                 id=repair.id,
@@ -23,7 +25,7 @@ async def get_forms(db: Session = Depends(get_db)):
                 isAlterable=repair.isAlterable,
                 standards=repair.standards,
                 indexNumber=repair.indexNumber
-            ) for repair in form.form_repairs
+            ) for repair in sorted(form.form_repairs, key=lambda r: r.indexNumber)
         ]
 
         # 주문서 양식 사용 여부 확인
@@ -36,10 +38,11 @@ async def get_forms(db: Session = Depends(get_db)):
                 repairs=repairs,
                 categories=category_list,
                 created_at=form.created_at,
-                is_used=is_used 
+                is_used=is_used
             )
         )
     return form_responses
+
 
 # 특정 주문서 양식 조회 API
 @router.get("/forms/{formID}", response_model=FormUsedResponse, summary="특정 주문서 양식 조회", tags=["주문서 양식 API"])
@@ -48,9 +51,11 @@ async def get_form(formID: int, db: Session = Depends(get_db)):
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
 
+    # 카테고리 정보 조회
     categories = db.query(Category).join(FormCategory).filter(FormCategory.form_id == formID).all()
     category_list = [{"id": category.id, "name": category.name} for category in categories]
 
+    # 수선 정보 정렬 후 조회
     repairs = [
         FormRepairResponse(
             id=repair.id,
@@ -59,7 +64,7 @@ async def get_form(formID: int, db: Session = Depends(get_db)):
             isAlterable=repair.isAlterable,
             standards=repair.standards,
             indexNumber=repair.indexNumber
-        ) for repair in form.form_repairs
+        ) for repair in sorted(form.form_repairs, key=lambda r: r.indexNumber)
     ]
 
     # 주문서 양식 사용 여부 확인
@@ -71,21 +76,24 @@ async def get_form(formID: int, db: Session = Depends(get_db)):
         repairs=repairs,
         categories=category_list,
         created_at=form.created_at,
-        is_used=is_used  # 추가된 필드
+        is_used=is_used
     )
 
 # 주문서 양식 생성 API
 @router.post("/forms", response_model=FormResponse, status_code=status.HTTP_201_CREATED, summary="주문서 양식 생성", tags=["주문서 양식 API"])
 async def create_form(form: FormCreate, db: Session = Depends(get_db)):
     try:
+        # 새로운 폼 생성
         new_form = Form(name=form.name)
         db.add(new_form)
         db.flush()
 
+        # 폼 카테고리 저장
         for category_id in form.categories:
             form_category = FormCategory(form_id=new_form.id, category_id=category_id)
             db.add(form_category)
 
+        # 폼 수리 정보 저장
         for idx, repair in enumerate(form.repairs, start=1):
             form_repair = FormRepair(
                 form_id=new_form.id,
@@ -93,13 +101,18 @@ async def create_form(form: FormCreate, db: Session = Depends(get_db)):
                 unit=repair.unit,
                 isAlterable=repair.isAlterable,
                 standards=repair.standards,
-                indexNumber=idx  
+                indexNumber=idx  # 인덱스 번호 순차적으로 부여
             )
             db.add(form_repair)
 
         db.commit()
+
+        # 카테고리 정보 조회
         categories = db.query(Category).filter(Category.id.in_(form.categories)).all()
         category_list = [{"id": category.id, "name": category.name} for category in categories]
+
+        # 수리 정보 정렬 조회
+        repairs = db.query(FormRepair).filter(FormRepair.form_id == new_form.id).order_by(FormRepair.indexNumber).all()
 
         return FormResponse(
             id=new_form.id,
@@ -111,7 +124,7 @@ async def create_form(form: FormCreate, db: Session = Depends(get_db)):
                 isAlterable=repair.isAlterable,
                 standards=repair.standards,
                 indexNumber=repair.indexNumber
-            ) for repair in new_form.form_repairs],
+            ) for repair in repairs],  # 비어 있을 경우 빈 리스트로 반환
             categories=category_list,
             created_at=new_form.created_at
         )
@@ -128,20 +141,21 @@ async def update_form(formID: int, form: FormCreate, db: Session = Depends(get_d
         existing_form = db.query(Form).filter(Form.id == formID).first()
         if not existing_form:
             raise HTTPException(status_code=404, detail="Form not found")
-        
+
         # Form 업데이트
         existing_form.name = form.name
         db.flush()
 
         # 기존 repairs 삭제 및 업데이트
         db.query(FormRepair).filter(FormRepair.form_id == formID).delete()
-        for repair in form.repairs:
+        for idx, repair in enumerate(form.repairs, start=1):  # 순차적으로 indexNumber 부여
             new_repair = FormRepair(
                 form_id=formID,
                 information=repair.information,
                 unit=repair.unit,
                 isAlterable=repair.isAlterable,
                 standards=repair.standards,
+                indexNumber=idx  # indexNumber를 업데이트 시에도 유지
             )
             db.add(new_repair)
 
@@ -153,12 +167,12 @@ async def update_form(formID: int, form: FormCreate, db: Session = Depends(get_d
 
         db.commit()
 
-
-        # 카테고리 조회 및 리스트 생성
+        # 수정된 데이터 반환
         categories = db.query(Category).filter(Category.id.in_(form.categories)).all()
         category_list = [{"id": category.id, "name": category.name} for category in categories]
 
-        # 수정된 양식 반환
+        repairs = db.query(FormRepair).filter(FormRepair.form_id == formID).order_by(FormRepair.indexNumber).all()
+
         return FormResponse(
             id=existing_form.id,
             name=existing_form.name,
@@ -169,7 +183,7 @@ async def update_form(formID: int, form: FormCreate, db: Session = Depends(get_d
                 isAlterable=repair.isAlterable,
                 standards=repair.standards,
                 indexNumber=repair.indexNumber
-            ) for repair in existing_form.form_repairs],
+            ) for repair in repairs],  # 비어 있을 경우 빈 리스트 반환
             categories=category_list,
             created_at=existing_form.created_at
         )

@@ -50,6 +50,7 @@ async def get_orders(
         Delivery_completed = 'Delivery completed' / 배송완료\n
         Receipt_completed = 'Receipt completed' / 수령완료\n
         Accommodation = 'Accommodation' / 숙소\n
+        Counsel = 'Counsel' / 상담\n
     사용법: /orders?status=Order_Completed\n
     3.order_date_from 및 order_date_to:\n
     설명: 지정된 기간 내의 주문서만 조회.\n
@@ -59,7 +60,7 @@ async def get_orders(
     옵션: order_date_asc (날짜 오름차순), order_date_desc (날짜 내림차순)\n
     사용법: /orders?sort=order_date_asc\n
     5.search:\n
-    설명: [고객 이름, 작성자, 주소, 소속, 노트, 수선 노트]로 검색.\n
+    설명: [고객 이름, 작성자, 주소, 소속, 연락처, 노트, 수선 노트]로 검색.\n
     사용법: /orders?search=John \n
     6.is_temp:\n
     설명: 일반/임시 주문서 선택 조회\n
@@ -68,7 +69,6 @@ async def get_orders(
     설명: 페이징을 위한 필터, limit은 반환할 주문서 수, offset은 시작 위치.\n
     사용법: /orders?limit=10&offset=20\n
     """
-    # 필요한 데이터 로드 설정
     query = db.query(Order).options(
         joinedload(Order.author),
         joinedload(Order.affiliation),
@@ -88,6 +88,7 @@ async def get_orders(
                 Order.groomName.ilike(f"%{search}%"),
                 Order.brideName.ilike(f"%{search}%"),
                 Order.address.ilike(f"%{search}%"),
+                Order.contact.ilike(f"%{search}%"),
                 Order.notes.ilike(f"%{search}%"),
                 Order.alter_notes.ilike(f"%{search}%"),
                 Author.name.ilike(f"%{search}%"),
@@ -115,6 +116,7 @@ async def get_orders(
             author_id=order.author_id,
             modifier_id=order.modifier_id,
             affiliation_id=order.affiliation_id,
+            orderNumber=order.orderNumber,
             event_name=order.event.name,
             form_name=order.event.form.name,
             groomName=order.groomName,
@@ -166,6 +168,7 @@ async def get_orders(
 
     return OrderListResponse(orders=order_list, total=total_orders)
 
+
 # 2. 단일 주문서 상세 조회 API
 @router.get("/order/{orderID}", response_model=OrderDetailResponse, summary="주문서 상세 조회", tags=["주문서 API"])
 async def get_order_detail(orderID: int, db: Session = Depends(get_db)):
@@ -187,6 +190,7 @@ async def get_order_detail(orderID: int, db: Session = Depends(get_db)):
         author_id=order.author_id,
         modifier_id=order.modifier_id,
         affiliation_id=order.affiliation_id,
+        orderNumber=order.orderNumber,
         event_name=order.event.name,
         groomName=order.groomName,
         brideName=order.brideName,
@@ -262,6 +266,7 @@ async def get_order_detail(orderID: int, db: Session = Depends(get_db)):
 
     return order_detail
 
+
 # 주문 상태 업데이트 API
 @router.put("/orders/{orderID}/{order_status}", response_model=OrderStatusUpdate, summary="주문 상태 업데이트", tags=["주문서 API"])
 async def update_order_status(
@@ -278,6 +283,7 @@ async def update_order_status(
         Delivery_completed = 'Delivery completed' / 배송완료\n
         Receipt_completed = 'Receipt completed' / 수령완료\n
         Accommodation = 'Accommodation' / 숙소\n
+        Counsel = 'Counsel' / 상담\n
     """
     # 주문서 조회
     order = db.query(Order).filter(Order.id == orderID).first()
@@ -308,14 +314,31 @@ async def update_order_status(
 async def create_order(order: OrderCreate, db: Session = Depends(get_db), is_temp: bool = False):
     """
     새로운 주문서 생성
-    is_temp: True면 임시 저장 주문서로 저장
     """
     try:
+        # 임시 저장이 아닌 경우에만 주문번호 생성
+        order_number = None
+        if not is_temp:  
+            today_prefix = datetime.now(timezone.utc).strftime("%y%m%d")
+            latest_order = (
+                db.query(Order)
+                .filter(Order.orderNumber.like(f"{today_prefix}-%"))
+                .order_by(Order.orderNumber.desc())
+                .first()
+            )
+            if latest_order:
+                last_sequence = int(latest_order.orderNumber.split("-")[1])
+                next_sequence = f"{last_sequence + 1:03d}"
+            else:
+                next_sequence = "001"
+            order_number = f"{today_prefix}-{next_sequence}"
+
         # 새로운 주문서 생성
         new_order = Order(
             event_id=order.event_id,
             author_id=order.author_id,
             modifier_id=order.modifier_id,
+            orderNumber=order_number,  # 생성된 주문번호 할당
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
             status=order.status,
@@ -330,7 +353,7 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db), is_tem
             totalPrice=order.totalPrice,
             advancePayment=order.advancePayment,
             balancePayment=order.balancePayment,
-            isTemporary=is_temp 
+            isTemporary=is_temp
         )
 
         db.add(new_order)
@@ -381,7 +404,11 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db), is_tem
 
         # 모든 데이터 커밋
         db.commit()
-        return {"message": "Order saved successfully!", "order_id": new_order.id}
+        return {
+            "message": "Order saved successfully!",
+            "order_id": new_order.id,
+            "orderNumber": new_order.orderNumber if not is_temp else None 
+        }
 
     except Exception as e:
         db.rollback()
@@ -393,10 +420,25 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
     기존 주문서 수정
     """
     try:
-        # 수정할 주문서 검색
         existing_order = db.query(Order).filter(Order.id == order_id).first()
         if not existing_order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        # orderNumber가 None이고 is_temp가 False일 경우 새로운 주문번호 생성
+        if not is_temp and not existing_order.orderNumber:
+            today_prefix = datetime.now(timezone.utc).strftime("%y%m%d")
+            latest_order = (
+                db.query(Order)
+                .filter(Order.orderNumber.like(f"{today_prefix}-%"))
+                .order_by(Order.orderNumber.desc())
+                .first()
+            )
+            if latest_order:
+                last_sequence = int(latest_order.orderNumber.split("-")[1])
+                next_sequence = f"{last_sequence + 1:03d}"
+            else:
+                next_sequence = "001"
+            existing_order.orderNumber = f"{today_prefix}-{next_sequence}"
 
         # 주문 정보 수정
         existing_order.event_id = order.event_id
@@ -411,13 +453,13 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
         existing_order.address = order.address
         existing_order.collectionMethod = order.collectionMethod
         existing_order.notes = order.notes
-        existing_order.alter_notes = order.alter_notes,
+        existing_order.alter_notes = order.alter_notes
         existing_order.totalPrice = order.totalPrice
         existing_order.advancePayment = order.advancePayment
         existing_order.balancePayment = order.balancePayment
         existing_order.isTemporary = is_temp
 
-        db.flush()  # 변경 사항 반영
+        db.flush()
 
         # 상품 정보 (OrderItems) 업데이트 (삭제 후 재생성)
         db.query(OrderItems).filter(OrderItems.order_id == existing_order.id).delete()
@@ -425,20 +467,18 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
             new_item = OrderItems(
                 order_id=existing_order.id,
                 product_id=order_item.product_id,
-                attribute_id=order_item.attributes_id, 
+                attribute_id=order_item.attributes_id,
                 quantity=order_item.quantity,
                 price=order_item.price
             )
             db.add(new_item)
 
-        # 결제 정보 업데이트 (order_id와 paymentMethod를 기준으로 존재 여부 확인 후 업데이트 또는 삽입)
+        # 결제 정보 업데이트
         for payment in order.payments:
             existing_payment = db.query(Payments).filter(
                 and_(Payments.order_id == existing_order.id, Payments.paymentMethod == payment.paymentMethod)
             ).first()
-
             if existing_payment:
-                # 이미 존재하는 경우 업데이트
                 existing_payment.payer = payment.payer
                 existing_payment.payment_date = payment.payment_date
                 existing_payment.cashAmount = payment.cashAmount
@@ -452,7 +492,6 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
                 existing_payment.tradeInConversion = payment.tradeInConversion
                 existing_payment.notes = payment.notes
             else:
-                # 존재하지 않는 경우 새로 삽입
                 new_payment = Payments(
                     order_id=existing_order.id,
                     payer=payment.payer,
@@ -471,18 +510,15 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
                 )
                 db.add(new_payment)
 
-        # 수선 정보 업데이트 (order_id와 form_repair_id를 기준으로 존재 여부 확인 후 업데이트 또는 삽입)
+        # 수선 정보 업데이트
         for alteration in order.alteration_details:
             existing_alteration = db.query(AlterationDetails).filter(
                 and_(AlterationDetails.order_id == existing_order.id, AlterationDetails.form_repair_id == alteration.form_repair_id)
             ).first()
-
             if existing_alteration:
-                # 이미 존재하는 경우 업데이트
                 existing_alteration.figure = alteration.figure
                 existing_alteration.alterationFigure = alteration.alterationFigure
             else:
-                # 존재하지 않는 경우 새로 삽입
                 new_alteration = AlterationDetails(
                     order_id=existing_order.id,
                     form_repair_id=alteration.form_repair_id,
@@ -490,7 +526,6 @@ async def update_order(order_id: int, order: OrderCreate, db: Session = Depends(
                     alterationFigure=alteration.alterationFigure,
                 )
                 db.add(new_alteration)
-
         # 모든 데이터 커밋
         db.commit()
         return {"message": "Order updated successfully!", "order_id": existing_order.id}
@@ -519,22 +554,16 @@ async def delete_order(order_id: int, db: Session = Depends(get_db)):
 
     if not existing_order:
         raise HTTPException(status_code=404, detail="주문서를 찾을 수 없습니다.")
-
     # OrderItems 삭제
     db.query(OrderItems).filter(OrderItems.order_id == order_id).delete()
-
     # Payments 삭제
     db.query(Payments).filter(Payments.order_id == order_id).delete()
-
     # AlterationDetails 삭제
     db.query(AlterationDetails).filter(AlterationDetails.order_id == order_id).delete()
-
     # 주문서 삭제
     db.delete(existing_order)
-
     # 변경 사항 커밋
     db.commit()
-
     return {"message": "주문서 및 관련 데이터가 성공적으로 삭제되었습니다.", "order_id": order_id}
 
 @router.get("/orders/download", summary="Excel 다운로드", tags=["주문서 API"])
