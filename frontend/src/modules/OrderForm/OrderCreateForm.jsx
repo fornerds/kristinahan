@@ -722,7 +722,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
         </div>
       </section>
 
-      <section className={styles.sectionWrap}>
+      <section className={`${styles.sectionWrap} ${styles.alterationSection}`}>
         <h3 className={styles.sectionTitle}>수선정보</h3>
         {event?.form?.repairs &&
           chunk(event.form.repairs, 3).map((repairGroup, groupIndex) => (

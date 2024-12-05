@@ -228,3 +228,57 @@
   border-radius: 4px;
   margin-right: 0.5rem;
 }
+
+.alterationSection .sectionGroupWrap {
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: flex-start;
+}
+
+.alterationSection .sectionVerticalGroup {
+  width: calc(33.333% - 14px);
+  min-width: 220px;
+  max-width: 300px;
+}
+
+.alterationSection .sectionLabel {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.alterationInputGroup {
+  display: flex;
+  gap: 12px;
+}
+
+.inputWrapper {
+  flex: 1;
+}
+
+.inputLabel {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.alterationSection .numberInput {
+  width: calc(100% - 35px);
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--cancel-color);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* 수선정보 비고 섹션 */
+.alterationSection .sectionValueWrap {
+  margin-top: 30px;
+}
+
+.alterationSection .optionalMessage {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px;
+}
