@@ -23,6 +23,7 @@ const formatOrderStatus = (status) => {
     "Delivery completed": "배송완료",
     "Receipt completed": "수령완료",
     Accommodation: "숙소",
+    Counsel: "상담",
   };
   return statusMap[status] || status;
 };
@@ -271,6 +272,7 @@ export const OrderList = () => {
                   <option value="Delivery completed">배송완료</option>
                   <option value="Receipt completed">수령완료</option>
                   <option value="Accommodation">숙소</option>
+                  <option value="Counsel">상담</option>
                 </select>
               </td>
               <td>{new Date(order.created_at).toLocaleDateString("ko-KR")}</td>

@@ -22,6 +22,7 @@ const ORDER_STATUS_MAP = {
   "Delivery completed": "배송완료",
   "Receipt completed": "수령완료",
   Accommodation: "숙소",
+  Counsel: "상담",
 };
 
 const chunk = (array, size) => {
