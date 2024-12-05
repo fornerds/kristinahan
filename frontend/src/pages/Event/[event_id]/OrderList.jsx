@@ -195,6 +195,7 @@ export const OrderList = () => {
     <table className={styles.table}>
       <thead>
         <tr>
+          <th scope="col">ID</th>
           <th scope="col">작성자</th>
           <th scope="col">신랑</th>
           <th scope="col">신부</th>
@@ -244,6 +245,7 @@ export const OrderList = () => {
               onClick={(event) => handleRowClick(event, order)}
               className={styles.orderLink}
             >
+              <td>{order.id || "-"}</td>
               <td>{authors[order.author_id] || order.author_id || "-"}</td>
               <td>{order.groomName || "-"}</td>
               <td>{order.brideName || "-"}</td>
@@ -252,7 +254,7 @@ export const OrderList = () => {
                   order.affiliation_id ||
                   "-"}
               </td>
-              <td>{getCollectionMethod(order.collectionMethod)}</td>
+              <td>{getCollectionMethod(order.collectionMethod) || "-"}</td>
               <td>
                 <select
                   name={`order_${order.id}`}
