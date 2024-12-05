@@ -1,0 +1,64 @@
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+  padding: 0 1rem;
+}
+
+.card {
+  max-width: 28rem;
+  width: 100%;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.cardContent {
+  padding: 1.5rem;
+}
+
+.errorCode {
+  font-size: 3.75rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 1rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.message {
+  color: #4b5563;
+  margin-bottom: 1.5rem;
+}
+
+.center {
+  text-align: center;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: #2563eb;
+}
+
+.icon {
+  width: 1rem;
+  height: 1rem;
+}

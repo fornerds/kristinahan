@@ -27,12 +27,14 @@ import {
   Event as EventEdit,
 } from "./pages/Admin/Event";
 import { Password } from "./pages/Admin/Password";
+import { NotFound } from "./pages/NotFound";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/admin/login" element={<AdminLogin />} />
 
         {/* Protected routes for regular users */}
@@ -69,6 +71,7 @@ function App() {
           <Route path="/admin/event/create" element={<EventCreate />} />
           <Route path="/admin/event/:event_id" element={<EventEdit />} />
           <Route path="/admin/password" element={<Password />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </BrowserRouter>
