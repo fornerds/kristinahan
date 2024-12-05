@@ -47,7 +47,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const saveOrderMutation = useSaveOrder();
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
-  console.log(orderData);
+  // console.log(orderData);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -64,9 +64,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     balancePayment: 0,
     isTemporary: false,
     status: "",
-    alteration_details: {
-      notes: "",
-    },
+    alteration_details: [],
+    alter_notes: "",
   });
 
   const [selectedProducts, setSelectedProducts] = useState({});
@@ -209,20 +208,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     });
 
     // Update alteration_details to new format
-    const alterationDetails = event?.form?.repairs
-      ?.map((repair) => {
-        const figureValue =
-          formData.alteration_details[`${repair.type}_figure`] || 0;
-        const alterationValue =
-          formData.alteration_details[`${repair.type}_alteration`] || 0;
-
-        return {
-          form_repair_id: repair.id,
-          figure: safeParseFloat(figureValue),
-          alterationFigure: safeParseFloat(alterationValue),
-        };
-      })
-      .filter((detail) => detail.figure !== 0 || detail.alterationFigure !== 0);
+    const alterationDetails = formData.alteration_details.filter(
+      (detail) => detail.figure !== 0 || detail.alterationFigure !== 0
+    );
 
     return {
       event_id: safeParseInt(event_id),
@@ -236,7 +224,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       address: formData.address || "",
       collectionMethod: formData.collectionMethod || "",
       notes: formData.notes || "",
-      alter_notes: formData.alteration_details.notes || "",
+      alter_notes: formData.alter_notes || "",
       totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
@@ -283,18 +271,19 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
       });
 
       // alteration details 초기화
-      const alterationDetailsObj = {
-        notes: orderData.alter_notes || "",
-      };
-
-      if (event?.form?.repairs) {
-        event.form.repairs.forEach((repair) => {
-          const detail = orderData.alteration_details?.find(
+      let alterationDetails = [];
+      if (event?.form?.repairs && orderData.alteration_details) {
+        alterationDetails = event.form.repairs.map((repair) => {
+          const existingDetail = orderData.alteration_details.find(
             (d) => d.form_repair_id === repair.id
           );
-          alterationDetailsObj[`${repair.type}_figure`] = detail?.figure || 0;
-          alterationDetailsObj[`${repair.type}_alteration`] =
-            detail?.alterationFigure || 0;
+          return (
+            existingDetail || {
+              form_repair_id: repair.id,
+              figure: 0,
+              alterationFigure: 0,
+            }
+          );
         });
       }
 
@@ -383,7 +372,8 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         ...prev,
         ...orderData,
         status: convertStatusFromApiFormat(orderData.status),
-        alteration_details: alterationDetailsObj,
+        alteration_details: alterationDetails,
+        alter_notes: orderData.alter_notes || "",
         author_id: orderData.author_id || "",
         modifier_id: orderData.modifier_id || "",
       }));
@@ -469,31 +459,58 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
-  const handleAlterationChange = (field, value) => {
+  const handleAlterationChange = (repairId, field, value) => {
     if (field === "notes") {
       setFormData((prev) => ({
         ...prev,
-        alteration_details: {
-          ...prev.alteration_details,
-          notes: value,
-        },
         alter_notes: value,
       }));
-    } else {
-      setFormData((prev) => {
-        const currentDetails = { ...prev.alteration_details };
-        const [repairType, fieldType] = field.split("_");
-
-        if (fieldType === "figure" || fieldType === "alteration") {
-          currentDetails[field] = parseFloat(parseFloat(value).toFixed(1));
-        }
-
-        return {
-          ...prev,
-          alteration_details: currentDetails,
-        };
-      });
+      return;
     }
+
+    setFormData((prev) => {
+      const updatedDetails = [...prev.alteration_details];
+      const existingDetailIndex = updatedDetails.findIndex(
+        (detail) => detail.form_repair_id === repairId
+      );
+
+      // value가 문자열인 경우 (입력 진행 중)
+      if (typeof value === "string") {
+        // 입력 진행 중인 값 그대로 유지
+        if (existingDetailIndex >= 0) {
+          updatedDetails[existingDetailIndex] = {
+            ...updatedDetails[existingDetailIndex],
+            [field === "figure" ? "figure" : "alterationFigure"]: value,
+          };
+        } else {
+          updatedDetails.push({
+            form_repair_id: repairId,
+            figure: field === "figure" ? value : 0,
+            alterationFigure: field === "alteration" ? value : 0,
+          });
+        }
+      } else {
+        // 숫자값으로 변환된 경우 (onBlur 등에서 호출)
+        if (existingDetailIndex >= 0) {
+          updatedDetails[existingDetailIndex] = {
+            ...updatedDetails[existingDetailIndex],
+            [field === "figure" ? "figure" : "alterationFigure"]:
+              field === "figure" ? Math.max(0, value) : value,
+          };
+        } else {
+          updatedDetails.push({
+            form_repair_id: repairId,
+            figure: field === "figure" ? Math.max(0, value) : 0,
+            alterationFigure: field === "alteration" ? value : 0,
+          });
+        }
+      }
+
+      return {
+        ...prev,
+        alteration_details: updatedDetails,
+      };
+    });
   };
 
   const handleGroomNameChange = useCallback((e) => {
@@ -987,31 +1004,48 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
                       <label className={styles.inputLabel}>최종 길이</label>
                       <div className={styles.sectionGroup}>
                         <input
-                          type="number"
+                          type="text"
                           className={styles.numberInput}
-                          step="0.1"
-                          min="0"
-                          value={(
-                            formData.alteration_details[
-                              `${repair.type}_figure`
-                            ] || 0
-                          ).toFixed(1)}
+                          value={
+                            formData.alteration_details.find(
+                              (detail) => detail.form_repair_id === repair.id
+                            )?.figure ?? 0
+                          }
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === "" || isNaN(value)) {
+                            // 더 유연한 정규식 패턴 - 소수점 입력 과정 허용
+                            const numberRegex = /^-?(\d*\.?\d*)?$/;
+
+                            // 빈 문자열, 소수점, 또는 정규식에 맞는 입력 허용
+                            if (
+                              value === "" ||
+                              value === "." ||
+                              numberRegex.test(value)
+                            ) {
                               handleAlterationChange(
-                                `${repair.type}_figure`,
-                                0
+                                repair.id,
+                                "figure",
+                                value
                               );
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || value === ".") {
+                              handleAlterationChange(repair.id, "figure", 0);
                               return;
                             }
-                            const numValue = parseFloat(
-                              parseFloat(value).toFixed(1)
-                            );
-                            handleAlterationChange(
-                              `${repair.type}_figure`,
-                              numValue
-                            );
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue)) {
+                              const formattedValue = parseFloat(
+                                numValue.toFixed(1)
+                              );
+                              handleAlterationChange(
+                                repair.id,
+                                "figure",
+                                formattedValue
+                              );
+                            }
                           }}
                         />
                         {repair.unit}
@@ -1023,30 +1057,59 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
                       <label className={styles.inputLabel}>수선 길이</label>
                       <div className={styles.sectionGroup}>
                         <input
-                          type="number"
+                          type="text"
                           className={styles.numberInput}
-                          step="0.1"
-                          value={(
-                            formData.alteration_details[
-                              `${repair.type}_alteration`
-                            ] || 0
-                          ).toFixed(1)}
+                          value={
+                            formData.alteration_details.find(
+                              (detail) => detail.form_repair_id === repair.id
+                            )?.alterationFigure ?? 0
+                          }
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === "" || isNaN(value)) {
+                            // 더 유연한 정규식 패턴 - 음수와 소수점 입력 과정 허용
+                            const numberRegex = /^-?(\d*\.?\d*)?$/;
+
+                            // 빈 문자열, 마이너스, 소수점, 또는 정규식에 맞는 입력 허용
+                            if (
+                              value === "" ||
+                              value === "-" ||
+                              value === "." ||
+                              value === "-." ||
+                              numberRegex.test(value)
+                            ) {
                               handleAlterationChange(
-                                `${repair.type}_alteration`,
+                                repair.id,
+                                "alteration",
+                                value
+                              );
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (
+                              value === "" ||
+                              value === "-" ||
+                              value === "." ||
+                              value === "-."
+                            ) {
+                              handleAlterationChange(
+                                repair.id,
+                                "alteration",
                                 0
                               );
                               return;
                             }
-                            const numValue = parseFloat(
-                              parseFloat(value).toFixed(1)
-                            );
-                            handleAlterationChange(
-                              `${repair.type}_alteration`,
-                              numValue
-                            );
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue)) {
+                              const formattedValue = parseFloat(
+                                numValue.toFixed(1)
+                              );
+                              handleAlterationChange(
+                                repair.id,
+                                "alteration",
+                                formattedValue
+                              );
+                            }
                           }}
                         />
                         {repair.unit}
@@ -1063,7 +1126,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
               className={styles.optionalMessage}
-              value={formData.alteration_details.notes}
+              value={formData.alter_notes}
               onChange={(e) => handleAlterationChange("notes", e.target.value)}
             />
           </div>

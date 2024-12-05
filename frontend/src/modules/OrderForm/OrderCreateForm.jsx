@@ -4,7 +4,6 @@ import PaymentTable from "./PaymentTable/PaymentTable";
 import { Modal } from "../Modal";
 import styles from "./OrderForm.module.css";
 import {
-  useOrderDetails,
   useAuthors,
   useAffiliations,
   useEventDetails,
@@ -31,10 +30,6 @@ const chunk = (array, size) => {
   return chunked;
 };
 
-const convertStatusFromApiFormat = (status) => {
-  return status.replace(/_/g, " ");
-};
-
 export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
   const { data: event, isLoading: isEventLoading } = useEventDetails(event_id);
   const { data: categories, isLoading: isCategoriesLoading } = useCategories();
@@ -58,9 +53,8 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     balancePayment: 0,
     isTemporary: false,
     status: "Order Completed",
-    alteration_details: {
-      notes: "",
-    },
+    alteration_details: [], // 변경: 객체에서 배열로
+    alter_notes: "", // 변경: notes를 별도 필드로
   });
 
   const [selectedProducts, setSelectedProducts] = useState({});
@@ -104,7 +98,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     },
   ]);
 
-  // useMemo hooks
+  // Memos
   const groupedProducts = useMemo(() => {
     if (!categories || !event) return {};
     const newGroupedProducts = {};
@@ -123,6 +117,19 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
         )
       );
       setOrderCategories(filteredCategories);
+
+      // 초기 alteration_details 설정
+      if (event.form.repairs) {
+        const initialAlterationDetails = event.form.repairs.map((repair) => ({
+          form_repair_id: repair.id,
+          figure: 0,
+          alterationFigure: 0,
+        }));
+        setFormData((prev) => ({
+          ...prev,
+          alteration_details: initialAlterationDetails,
+        }));
+      }
     }
   }, [event, categories]);
 
@@ -140,7 +147,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     }));
   }, [selectedProducts, prepaymentTotal, balanceTotal]);
 
-  // Handlers
+  // Basic handlers
   const handleAuthorChange = (e) => {
     const { value } = e.target;
     setFormData((prevFormData) => ({
@@ -187,6 +194,61 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
+  const handleAlterationChange = (repairId, field, value) => {
+    if (field === "notes") {
+      setFormData((prev) => ({
+        ...prev,
+        alter_notes: value,
+      }));
+      return;
+    }
+
+    setFormData((prev) => {
+      const updatedDetails = [...prev.alteration_details];
+      const existingDetailIndex = updatedDetails.findIndex(
+        (detail) => detail.form_repair_id === repairId
+      );
+
+      // value가 문자열인 경우 (입력 진행 중)
+      if (typeof value === "string") {
+        // 입력 진행 중인 값 그대로 유지
+        if (existingDetailIndex >= 0) {
+          updatedDetails[existingDetailIndex] = {
+            ...updatedDetails[existingDetailIndex],
+            [field === "figure" ? "figure" : "alterationFigure"]: value,
+          };
+        } else {
+          updatedDetails.push({
+            form_repair_id: repairId,
+            figure: field === "figure" ? value : 0,
+            alterationFigure: field === "alteration" ? value : 0,
+          });
+        }
+      } else {
+        // 숫자값으로 변환된 경우 (onBlur 등에서 호출)
+        const numericValue = field === "figure" ? Math.max(0, value) : value;
+
+        if (existingDetailIndex >= 0) {
+          updatedDetails[existingDetailIndex] = {
+            ...updatedDetails[existingDetailIndex],
+            [field === "figure" ? "figure" : "alterationFigure"]: numericValue,
+          };
+        } else {
+          updatedDetails.push({
+            form_repair_id: repairId,
+            figure: field === "figure" ? numericValue : 0,
+            alterationFigure: field === "alteration" ? numericValue : 0,
+          });
+        }
+      }
+
+      return {
+        ...prev,
+        alteration_details: updatedDetails,
+      };
+    });
+  };
+
   const handleGroomNameChange = useCallback((e) => {
     const newGroomName = e.target.value;
     setFormData((prev) => ({ ...prev, groomName: newGroomName }));
@@ -198,57 +260,54 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     setFormData((prev) => ({ ...prev, brideName: newBrideName }));
   }, []);
 
-  const handlePaymentChange = useCallback(
-    (index) => (updatedPayment) => {
-      setPayments((prev) => {
-        const newPayments = [...prev];
-        const basePayment = {
-          payment_date: updatedPayment.payment_date || new Date().toISOString(),
-          paymentMethod: index === 0 ? "ADVANCE" : "BALANCE",
-          notes: updatedPayment.notes || "",
-          payerName: updatedPayment.payerName || "",
-        };
+  const handlePaymentChange = useCallback((index, updatedPayment) => {
+    setPayments((prev) => {
+      const newPayments = [...prev];
+      const basePayment = {
+        payment_date: updatedPayment.payment_date || new Date().toISOString(),
+        paymentMethod: index === 0 ? "ADVANCE" : "BALANCE",
+        payerName: updatedPayment.payerName || "",
+        notes: updatedPayment.notes || "",
+      };
 
-        if (updatedPayment.cashAmount > 0 && updatedPayment.cashCurrency) {
-          basePayment.cashAmount = updatedPayment.cashAmount;
-          basePayment.cashCurrency = updatedPayment.cashCurrency;
-          basePayment.cashConversion = updatedPayment.cashConversion;
-        }
-
-        if (updatedPayment.cardAmount > 0 && updatedPayment.cardCurrency) {
-          basePayment.cardAmount = updatedPayment.cardAmount;
-          basePayment.cardCurrency = updatedPayment.cardCurrency;
-          basePayment.cardConversion = updatedPayment.cardConversion;
-        }
-
-        if (
-          updatedPayment.tradeInAmount > 0 &&
-          updatedPayment.tradeInCurrency
-        ) {
-          basePayment.tradeInAmount = updatedPayment.tradeInAmount;
-          basePayment.tradeInCurrency = updatedPayment.tradeInCurrency;
-          basePayment.tradeInConversion = updatedPayment.tradeInConversion;
-        }
-
-        newPayments[index] = basePayment;
-        return newPayments;
-      });
-
-      const newTotal =
-        (updatedPayment.cashAmount > 0 ? updatedPayment.cashConversion : 0) +
-        (updatedPayment.cardAmount > 0 ? updatedPayment.cardConversion : 0) +
-        (updatedPayment.tradeInAmount > 0
-          ? updatedPayment.tradeInConversion
-          : 0);
-
-      if (index === 0) {
-        setPrepaymentTotal(newTotal);
-      } else {
-        setBalanceTotal(newTotal);
+      // 현금 결제 처리
+      if (updatedPayment.cashAmount && updatedPayment.cashAmount > 0) {
+        basePayment.cashAmount = updatedPayment.cashAmount;
+        basePayment.cashCurrency = updatedPayment.cashCurrency;
+        basePayment.cashConversion = updatedPayment.cashConversion;
       }
-    },
-    []
-  );
+
+      // 카드 결제 처리
+      if (updatedPayment.cardAmount && updatedPayment.cardAmount > 0) {
+        basePayment.cardAmount = updatedPayment.cardAmount;
+        basePayment.cardCurrency = updatedPayment.cardCurrency;
+        basePayment.cardConversion = updatedPayment.cardConversion;
+      }
+
+      // 보상판매 처리
+      if (updatedPayment.tradeInAmount && updatedPayment.tradeInAmount > 0) {
+        basePayment.tradeInAmount = updatedPayment.tradeInAmount;
+        basePayment.tradeInCurrency = updatedPayment.tradeInCurrency;
+        basePayment.tradeInConversion = updatedPayment.tradeInConversion;
+      }
+
+      newPayments[index] = basePayment;
+      return newPayments;
+    });
+
+    // 각 결제 수단별 환산액 합계 계산
+    const newTotal =
+      (updatedPayment.cashAmount > 0 ? updatedPayment.cashConversion : 0) +
+      (updatedPayment.cardAmount > 0 ? updatedPayment.cardConversion : 0) +
+      (updatedPayment.tradeInAmount > 0 ? updatedPayment.tradeInConversion : 0);
+
+    // 선입금/잔금 총액 업데이트
+    if (index === 0) {
+      setPrepaymentTotal(newTotal);
+    } else {
+      setBalanceTotal(newTotal);
+    }
+  }, []);
 
   const handleProductChange = useCallback(
     (categoryId, field, value) => {
@@ -310,33 +369,6 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     [groupedProducts]
   );
 
-  const handleAlterationChange = (field, value) => {
-    if (field === "notes") {
-      setFormData((prev) => ({
-        ...prev,
-        alteration_details: {
-          ...prev.alteration_details,
-          notes: value,
-        },
-        alter_notes: value,
-      }));
-    } else {
-      setFormData((prev) => {
-        const currentDetails = { ...prev.alteration_details };
-        const [repairType, fieldType] = field.split("_");
-
-        if (fieldType === "figure" || fieldType === "alteration") {
-          currentDetails[field] = parseFloat(parseFloat(value).toFixed(1));
-        }
-
-        return {
-          ...prev,
-          alteration_details: currentDetails,
-        };
-      });
-    }
-  };
-
   const prepareOrderData = () => {
     const safeParseInt = (value) => {
       const parsed = parseInt(value, 10);
@@ -397,33 +429,22 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
       return basePayment;
     });
 
-    const alterationDetails = event?.form?.repairs
-      ?.map((repair) => {
-        const figureValue =
-          formData.alteration_details[`${repair.type}_figure`] || 0;
-        const alterationValue =
-          formData.alteration_details[`${repair.type}_alteration`] || 0;
-
-        return {
-          form_repair_id: repair.id,
-          figure: parseFloat(figureValue),
-          alterationFigure: parseFloat(alterationValue),
-        };
-      })
-      .filter((detail) => detail.figure !== 0 || detail.alterationFigure !== 0);
+    const alterationDetails = formData.alteration_details.filter(
+      (detail) => detail.figure !== 0 || detail.alterationFigure !== 0
+    );
 
     return {
       event_id: safeParseInt(event_id),
       author_id: safeParseInt(formData.author_id),
       affiliation_id: safeParseInt(formData.affiliation_id),
       status: "Order_Completed",
-      groomName: formData.groomName,
-      brideName: formData.brideName,
-      contact: formData.contact,
-      address: formData.address,
-      collectionMethod: formData.collectionMethod,
-      notes: formData.notes,
-      alter_notes: formData.alteration_details.notes,
+      groomName: formData.groomName || null,
+      brideName: formData.brideName || null,
+      contact: formData.contact || "",
+      address: formData.address || "",
+      collectionMethod: formData.collectionMethod || "",
+      notes: formData.notes || "",
+      alter_notes: formData.alter_notes || "",
       totalPrice,
       advancePayment: prepaymentTotal,
       balancePayment: balanceTotal,
@@ -502,6 +523,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
         </div>
       </section>
 
+      {/* 주문자정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>주문자정보</h3>
         <div className={styles.sectionGroupWrap}>
@@ -592,6 +614,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
         </div>
       </section>
 
+      {/* 상품정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>상품정보</h3>
         <table className={styles.table}>
@@ -681,18 +704,23 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
         </table>
       </section>
 
+      {/* 결제정보 섹션 */}
       <section className={styles.sectionWrap}>
         <h3 className={styles.sectionTitle}>결제정보</h3>
         <PaymentTable
           payment={payments[0]}
-          onPaymentChange={handlePaymentChange(0)}
+          onPaymentChange={(updatedPayment) =>
+            handlePaymentChange(0, updatedPayment)
+          }
           customerName={customerName}
           isEdit={false}
           label="선입금"
         />
         <PaymentTable
           payment={payments[1]}
-          onPaymentChange={handlePaymentChange(1)}
+          onPaymentChange={(updatedPayment) =>
+            handlePaymentChange(1, updatedPayment)
+          }
           customerName={customerName}
           isEdit={false}
           label="잔금"
@@ -731,69 +759,111 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
                 <div key={repair.id} className={styles.sectionVerticalGroup}>
                   <h4 className={styles.sectionLabel}>{repair.information}</h4>
                   <div className={styles.alterationInputGroup}>
+                    {/* 최종 길이 입력 필드 */}
                     <div className={styles.inputWrapper}>
                       <label className={styles.inputLabel}>최종 길이</label>
                       <div className={styles.sectionGroup}>
                         <input
-                          type="number"
+                          type="text"
                           className={styles.numberInput}
-                          step="0.1"
-                          min="0"
-                          value={(
-                            formData.alteration_details[
-                              `${repair.type}_figure`
-                            ] || 0
-                          ).toFixed(1)}
+                          value={
+                            formData.alteration_details.find(
+                              (detail) => detail.form_repair_id === repair.id
+                            )?.figure ?? "0.0"
+                          }
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === "" || isNaN(value)) {
+                            // 숫자, 소수점을 허용하는 정규식
+                            const numberRegex = /^(\d*\.?\d*)?$/;
+
+                            // 빈 문자열, 소수점, 또는 정규식에 맞는 입력 허용
+                            if (
+                              value === "" ||
+                              value === "." ||
+                              numberRegex.test(value)
+                            ) {
                               handleAlterationChange(
-                                `${repair.type}_figure`,
-                                0
+                                repair.id,
+                                "figure",
+                                value
                               );
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || value === ".") {
+                              handleAlterationChange(repair.id, "figure", 0);
                               return;
                             }
-                            const numValue = parseFloat(
-                              parseFloat(value).toFixed(1)
-                            );
-                            handleAlterationChange(
-                              `${repair.type}_figure`,
-                              numValue
-                            );
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue)) {
+                              handleAlterationChange(
+                                repair.id,
+                                "figure",
+                                parseFloat(numValue.toFixed(1))
+                              );
+                            }
                           }}
                         />
                         {repair.unit}
                       </div>
                     </div>
 
+                    {/* 수선 길이 입력 필드 */}
                     <div className={styles.inputWrapper}>
                       <label className={styles.inputLabel}>수선 길이</label>
                       <div className={styles.sectionGroup}>
                         <input
-                          type="number"
+                          type="text"
                           className={styles.numberInput}
-                          step="0.1"
-                          value={(
-                            formData.alteration_details[
-                              `${repair.type}_alteration`
-                            ] || 0
-                          ).toFixed(1)}
+                          value={
+                            formData.alteration_details.find(
+                              (detail) => detail.form_repair_id === repair.id
+                            )?.alterationFigure ?? "0.0"
+                          }
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === "" || isNaN(value)) {
+                            // 숫자, 소수점, 음수 부호를 허용하는 정규식
+                            const numberRegex = /^(-?\d*\.?\d*)?$/;
+
+                            // 빈 문자열, 마이너스, 소수점, 또는 정규식에 맞는 입력 허용
+                            if (
+                              value === "" ||
+                              value === "-" ||
+                              value === "." ||
+                              value === "-." ||
+                              numberRegex.test(value)
+                            ) {
                               handleAlterationChange(
-                                `${repair.type}_alteration`,
+                                repair.id,
+                                "alteration",
+                                value
+                              );
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (
+                              value === "" ||
+                              value === "-" ||
+                              value === "." ||
+                              value === "-."
+                            ) {
+                              handleAlterationChange(
+                                repair.id,
+                                "alteration",
                                 0
                               );
                               return;
                             }
-                            const numValue = parseFloat(
-                              parseFloat(value).toFixed(1)
-                            );
-                            handleAlterationChange(
-                              `${repair.type}_alteration`,
-                              numValue
-                            );
+                            const numValue = parseFloat(value);
+                            if (!isNaN(numValue)) {
+                              handleAlterationChange(
+                                repair.id,
+                                "alteration",
+                                parseFloat(numValue.toFixed(1))
+                              );
+                            }
                           }}
                         />
                         {repair.unit}
@@ -810,7 +880,7 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
               className={styles.optionalMessage}
-              value={formData.alteration_details.notes}
+              value={formData.alter_notes}
               onChange={(e) => handleAlterationChange("notes", e.target.value)}
             />
           </div>
