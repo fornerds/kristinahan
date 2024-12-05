@@ -49,6 +49,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
   // console.log(orderData);
+  console.log(event);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
@@ -288,16 +289,20 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         });
       }
 
-      // 상품 정보 초기화
-      const filteredCategories = categories.filter((category) =>
-        orderData.form.categories.some(
-          (formCategory) => formCategory.id === category.id
-        )
-      );
+      // API로 조회한 카테고리 순서 유지
+      const orderedCategories = event.form.categories
+        .map((formCategory) => {
+          const fullCategory = categories.find(
+            (cat) => cat.id === formCategory.id
+          );
+          return fullCategory;
+        })
+        .filter(Boolean); // null/undefined 제거
 
+      // 상품 정보 초기화
       const newSelectedProducts = {};
       orderData.orderItems.forEach((item) => {
-        const category = filteredCategories.find((cat) =>
+        const category = orderedCategories.find((cat) =>
           cat.products.some((prod) => prod.id === item.product.id)
         );
         if (category) {
@@ -363,8 +368,6 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         (balancePayment?.cardConversion || 0) +
         (balancePayment?.tradeInConversion || 0);
 
-      // console.log("Setting initial payments:", initialPayments);
-
       // 모든 상태 한번에 업데이트
       setPayments(initialPayments);
       setPrepaymentTotal(advanceTotal);
@@ -378,7 +381,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
         author_id: orderData.author_id || "",
         modifier_id: orderData.modifier_id || "",
       }));
-      setOrderCategories(filteredCategories);
+      setOrderCategories(orderedCategories); // 순서가 유지된 카테고리 배열 설정
       setSelectedProducts(newSelectedProducts);
       setTotalPrice(Number(orderData.totalPrice) || 0);
       setCustomerName(orderData.groomName || "");

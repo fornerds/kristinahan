@@ -39,6 +39,8 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
     useAffiliations();
   const saveOrderMutation = useSaveOrder();
 
+  console.log(event);
+
   const [formData, setFormData] = useState({
     event_id: event_id,
     author_id: null,
@@ -112,12 +114,17 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
   // Effects
   useEffect(() => {
     if (event && categories) {
-      const filteredCategories = categories.filter((category) =>
-        event.form.categories.some(
-          (formCategory) => formCategory.id === category.id
-        )
-      );
-      setOrderCategories(filteredCategories);
+      // API로 조회한 카테고리 순서 유지
+      const orderedCategories = event.form.categories
+        .map((formCategory) => {
+          const fullCategory = categories.find(
+            (cat) => cat.id === formCategory.id
+          );
+          return fullCategory;
+        })
+        .filter(Boolean); // null/undefined 제거
+
+      setOrderCategories(orderedCategories);
 
       // 초기 alteration_details 설정
       if (event.form.repairs) {
@@ -131,8 +138,79 @@ export const OrderCreateForm = ({ event_id, onSave, onComplete }) => {
           alteration_details: initialAlterationDetails,
         }));
       }
+
+      // 초기 선택된 상품 정보 초기화
+      const initialSelectedProducts = {};
+      orderedCategories.forEach((category) => {
+        initialSelectedProducts[category.id] = {
+          productId: "",
+          price: 0,
+          quantity: 1,
+          attributes: [],
+        };
+      });
+      setSelectedProducts(initialSelectedProducts);
+
+      // formData 초기화
+      setFormData((prev) => ({
+        ...prev,
+        event_id: event_id,
+        author_id: null,
+        affiliation_id: null,
+        groomName: "",
+        brideName: "",
+        contact: "",
+        address: "",
+        collectionMethod: "",
+        notes: "",
+        totalPrice: 0,
+        advancePayment: 0,
+        balancePayment: 0,
+        isTemporary: false,
+        status: "Order_Completed",
+        alter_notes: "",
+      }));
+
+      // 초기 결제 정보 설정
+      setPayments([
+        {
+          payment_date: new Date().toISOString(),
+          paymentMethod: "ADVANCE",
+          cashAmount: 0,
+          cashCurrency: "KRW",
+          cashConversion: 0,
+          cardAmount: 0,
+          cardCurrency: "KRW",
+          cardConversion: 0,
+          tradeInAmount: 0,
+          tradeInCurrency: "",
+          tradeInConversion: 0,
+          notes: "",
+          payerName: "",
+        },
+        {
+          payment_date: new Date().toISOString(),
+          paymentMethod: "BALANCE",
+          cashAmount: 0,
+          cashCurrency: "KRW",
+          cashConversion: 0,
+          cardAmount: 0,
+          cardCurrency: "KRW",
+          cardConversion: 0,
+          tradeInAmount: 0,
+          tradeInCurrency: "",
+          tradeInConversion: 0,
+          notes: "",
+          payerName: "",
+        },
+      ]);
+
+      // 초기 금액 설정
+      setTotalPrice(0);
+      setPrepaymentTotal(0);
+      setBalanceTotal(0);
     }
-  }, [event, categories]);
+  }, [event, categories, event_id]);
 
   useEffect(() => {
     const newTotalPrice = Object.values(selectedProducts).reduce(
