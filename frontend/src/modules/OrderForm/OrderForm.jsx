@@ -685,7 +685,9 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
 
         <div className={styles.sectionValueWrap}>
           <h4 className={styles.sectionLabel}>주문번호</h4>
-          <p className={styles.sectionValue}>{formData.id}</p>
+          <p className={styles.sectionValue}>
+            {formData.orderNumber || formData.id}
+          </p>
         </div>
 
         <div className={styles.sectionGroupWrap}>
