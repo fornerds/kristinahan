@@ -24,6 +24,7 @@ export const CurrencyInput = React.memo(
     const lastFetchedDate = useRef(null);
     const lastFetchedAmount = useRef(null);
     const lastFetchedCurrency = useRef(null);
+    const pendingAmount = useRef(null);
 
     const getFormattedDate = useCallback((date) => {
       if (!date) return null;
@@ -31,9 +32,9 @@ export const CurrencyInput = React.memo(
     }, []);
 
     const fetchAndCalculateRate = useCallback(
-      async (newAmount, newCurrency, date) => {
+      async (newAmount, newCurrency, date, isInitialFetch = false) => {
         // 값이 없거나 KRW인 경우 즉시 반환
-        if (!newAmount || !newCurrency || newCurrency === "KRW") {
+        if (!newCurrency || newCurrency === "KRW") {
           const finalAmount = newCurrency === "KRW" ? newAmount : 0;
           setConvertedAmount(finalAmount);
           onChange(newAmount || 0, newCurrency, finalAmount);
@@ -43,8 +44,9 @@ export const CurrencyInput = React.memo(
         const formattedDate =
           getFormattedDate(date) || getFormattedDate(new Date());
 
-        // 이전 요청과 동일한 조건이면 재요청하지 않음
+        // 이전 요청과 동일한 조건이면서 초기 fetch가 아닌 경우 재요청하지 않음
         if (
+          !isInitialFetch &&
           lastFetchedDate.current === formattedDate &&
           lastFetchedAmount.current === newAmount &&
           lastFetchedCurrency.current === newCurrency
@@ -105,56 +107,63 @@ export const CurrencyInput = React.memo(
       }
     }, [initialCurrency, initialAmount, initialConvertedAmount]);
 
-    // 날짜 변경 시 환율 조회
-    useEffect(() => {
-      if (currency && amount && selectedDate) {
-        const newFormattedDate = getFormattedDate(selectedDate);
-        if (lastFetchedDate.current !== newFormattedDate) {
-          fetchAndCalculateRate(amount, currency, selectedDate);
-        }
+    // 수정된 handleAmountChange 함수
+    const handleAmountChange = useCallback((e) => {
+      const inputValue = e.target.value;
+
+      // 빈 입력값 처리
+      if (inputValue === "") {
+        setAmount("");
+        pendingAmount.current = 0;
+        return;
       }
-    }, [
-      selectedDate,
-      currency,
-      amount,
-      fetchAndCalculateRate,
-      getFormattedDate,
-    ]);
 
-    const handleAmountChange = useCallback(
-      (e) => {
-        const inputValue = e.target.value;
-        const numericValue = inputValue.replace(/[^0-9]/g, "");
+      // 숫자만 허용하고 콤마 제거
+      const numericValue = inputValue.replace(/[^\d]/g, "");
 
-        if (inputValue === "") {
-          setAmount("");
-          if (currency) {
-            fetchAndCalculateRate(0, currency, selectedDate);
-          }
-          return;
-        }
-
+      if (numericValue !== "") {
         const newAmount = parseInt(numericValue, 10);
         setAmount(newAmount);
+        pendingAmount.current = newAmount;
+      }
+    }, []);
 
-        if (currency) {
-          fetchAndCalculateRate(newAmount, currency, selectedDate);
-        }
-      },
-      [currency, fetchAndCalculateRate, selectedDate]
-    );
+    // 입력 완료 시 처리
+    const handleBlur = useCallback(() => {
+      if (pendingAmount.current !== null && currency) {
+        fetchAndCalculateRate(pendingAmount.current, currency, selectedDate);
+        pendingAmount.current = null;
+      }
+    }, [currency, fetchAndCalculateRate, selectedDate]);
 
+    // 키보드 이벤트 처리
+    const handleKeyDown = useCallback((e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        e.target.blur();
+      }
+    }, []);
+
+    // 수정된 handleCurrencyChange 함수
     const handleCurrencyChange = useCallback(
       (e) => {
         const newCurrency = e.target.value || null;
         setCurrency(newCurrency);
 
-        const currentAmount = amount || 0;
+        // KRW인 경우 즉시 변환
+        if (newCurrency === "KRW") {
+          const currentAmount = pendingAmount.current || amount || 0;
+          setConvertedAmount(currentAmount);
+          onChange(currentAmount, newCurrency, currentAmount);
+          return;
+        }
+
+        // 화폐 단위 변경 시 초기 환율 정보 가져오기 (amount는 0으로 설정)
         if (newCurrency) {
-          fetchAndCalculateRate(currentAmount, newCurrency, selectedDate);
+          fetchAndCalculateRate(0, newCurrency, selectedDate, true);
         } else {
           setConvertedAmount(0);
-          onChange(currentAmount, newCurrency, 0);
+          onChange(0, null, 0);
         }
       },
       [amount, fetchAndCalculateRate, onChange, selectedDate]
@@ -187,6 +196,8 @@ export const CurrencyInput = React.memo(
             }`}
             value={amount}
             onChange={handleAmountChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
         </td>

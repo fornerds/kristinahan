@@ -49,7 +49,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
   const updateOrderStatusMutation = useUpdateOrderStatus();
 
   // console.log(orderData);
-  console.log(event);
+  // console.log(event);
 
   const [formData, setFormData] = useState({
     event_id: event_id,
