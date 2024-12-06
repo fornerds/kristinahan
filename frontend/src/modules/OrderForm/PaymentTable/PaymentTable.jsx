@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { CurrencyInput } from "../CurrencyInput";
 import styles from "./PaymentTable.module.css";
 
@@ -9,61 +9,91 @@ const PaymentTable = ({
   isEdit,
   label,
 }) => {
+  const prevPaymentRef = useRef(payment);
+
   const handleCurrencyChange = useCallback(
     (field) => (amount, currency, convertedAmount) => {
-      console.log(`${field} payment changed:`, {
-        amount,
-        currency,
-        convertedAmount,
-      });
+      const prevValue = prevPaymentRef.current;
+      const isSameValue =
+        field === "cash"
+          ? prevValue.cashAmount === amount &&
+            prevValue.cashCurrency === currency &&
+            prevValue.cashConversion === convertedAmount
+          : field === "card"
+          ? prevValue.cardAmount === amount &&
+            prevValue.cardCurrency === currency &&
+            prevValue.cardConversion === convertedAmount
+          : field === "tradeIn"
+          ? prevValue.tradeInAmount === amount &&
+            prevValue.tradeInCurrency === currency &&
+            prevValue.tradeInConversion === convertedAmount
+          : false;
+
+      if (isSameValue) {
+        return;
+      }
 
       const updatedPayment = { ...payment };
 
-      // field에 따라 해당하는 결제 수단만 업데이트
-      if (field === "cash") {
-        if (amount > 0 && currency) {
-          updatedPayment.cashAmount = amount;
-          updatedPayment.cashCurrency = currency;
-          updatedPayment.cashConversion = convertedAmount;
-        } else {
-          updatedPayment.cashAmount = null;
-          updatedPayment.cashCurrency = null;
-          updatedPayment.cashConversion = null;
-        }
-      } else if (field === "card") {
-        if (amount > 0 && currency) {
-          updatedPayment.cardAmount = amount;
-          updatedPayment.cardCurrency = currency;
-          updatedPayment.cardConversion = convertedAmount;
-        } else {
-          updatedPayment.cardAmount = null;
-          updatedPayment.cardCurrency = null;
-          updatedPayment.cardConversion = null;
-        }
-      } else if (field === "tradeIn") {
-        if (amount > 0 && currency) {
-          updatedPayment.tradeInAmount = amount;
-          updatedPayment.tradeInCurrency = currency;
-          updatedPayment.tradeInConversion = convertedAmount;
-        } else {
-          updatedPayment.tradeInAmount = null;
-          updatedPayment.tradeInCurrency = null;
-          updatedPayment.tradeInConversion = null;
-        }
-      }
+      const updateFields = {
+        cash: () => {
+          if (amount > 0 && currency) {
+            updatedPayment.cashAmount = amount;
+            updatedPayment.cashCurrency = currency;
+            updatedPayment.cashConversion = convertedAmount;
+          } else {
+            updatedPayment.cashAmount = null;
+            updatedPayment.cashCurrency = null;
+            updatedPayment.cashConversion = null;
+          }
+        },
+        card: () => {
+          if (amount > 0 && currency) {
+            updatedPayment.cardAmount = amount;
+            updatedPayment.cardCurrency = currency;
+            updatedPayment.cardConversion = convertedAmount;
+          } else {
+            updatedPayment.cardAmount = null;
+            updatedPayment.cardCurrency = null;
+            updatedPayment.cardConversion = null;
+          }
+        },
+        tradeIn: () => {
+          if (amount > 0 && currency) {
+            updatedPayment.tradeInAmount = amount;
+            updatedPayment.tradeInCurrency = currency;
+            updatedPayment.tradeInConversion = convertedAmount;
+          } else {
+            updatedPayment.tradeInAmount = null;
+            updatedPayment.tradeInCurrency = null;
+            updatedPayment.tradeInConversion = null;
+          }
+        },
+      };
 
-      console.log("Updated payment:", updatedPayment);
+      updateFields[field]();
+      prevPaymentRef.current = updatedPayment;
       onPaymentChange(updatedPayment);
     },
     [payment, onPaymentChange]
   );
 
   const handleDateChange = (e) => {
-    const date = e.target.value ? new Date(e.target.value) : null;
-    onPaymentChange({
-      ...payment,
-      payment_date: date ? date.toISOString() : null,
-    });
+    const selectedDate = e.target.value;
+    if (selectedDate) {
+      // 선택된 날짜의 UTC 시간을 해당 날짜의 자정으로 설정
+      const date = new Date(selectedDate);
+      date.setUTCHours(0, 0, 0, 0);
+      onPaymentChange({
+        ...payment,
+        payment_date: date.toISOString(),
+      });
+    } else {
+      onPaymentChange({
+        ...payment,
+        payment_date: null,
+      });
+    }
   };
 
   const handlePayerNameChange = (e) => {
@@ -82,10 +112,10 @@ const PaymentTable = ({
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date)
-      ? date.toISOString().split("T")[0]
-      : "";
+
+    // ISO 문자열에서 날짜 부분만 추출
+    const date = dateString.split("T")[0];
+    return date;
   };
 
   return (
@@ -113,6 +143,7 @@ const PaymentTable = ({
         </thead>
         <tbody>
           <CurrencyInput
+            key={`cash-${payment.payment_date}`}
             label="현금"
             currencies={["KRW", "JPY", "USD"]}
             onChange={handleCurrencyChange("cash")}
@@ -120,8 +151,10 @@ const PaymentTable = ({
             initialAmount={payment.cashAmount}
             initialConvertedAmount={payment.cashConversion}
             allowNull={false}
+            selectedDate={payment.payment_date}
           />
           <CurrencyInput
+            key={`card-${payment.payment_date}`}
             label="카드"
             currencies={["KRW", "JPY", "USD"]}
             onChange={handleCurrencyChange("card")}
@@ -129,8 +162,10 @@ const PaymentTable = ({
             initialAmount={payment.cardAmount}
             initialConvertedAmount={payment.cardConversion}
             allowNull={false}
+            selectedDate={payment.payment_date}
           />
           <CurrencyInput
+            key={`tradeIn-${payment.payment_date}`}
             label="보상판매"
             currencies={["10K", "14K", "18K", "24K"]}
             onChange={handleCurrencyChange("tradeIn")}
@@ -138,6 +173,7 @@ const PaymentTable = ({
             initialAmount={payment.tradeInAmount}
             initialConvertedAmount={payment.tradeInConversion}
             allowNull={true}
+            selectedDate={payment.payment_date}
           />
         </tbody>
       </table>
