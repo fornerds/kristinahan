@@ -210,9 +210,11 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     });
 
     // Update alteration_details to new format
-    const alterationDetails = formData.alteration_details.filter(
-      (detail) => detail.figure !== 0 || detail.alterationFigure !== 0
-    );
+    const alterationDetails = formData.alteration_details.map((detail) => ({
+      form_repair_id: detail.form_repair_id,
+      figure: detail.figure || 0,
+      alterationFigure: detail.alterationFigure || 0,
+    }));
 
     return {
       event_id: safeParseInt(event_id),
