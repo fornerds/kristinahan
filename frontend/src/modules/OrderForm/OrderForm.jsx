@@ -14,6 +14,7 @@ import {
 } from "../../api/hooks";
 
 const ORDER_STATUS_MAP = {
+  Counsel: "상담",
   "Order Completed": "주문완료",
   "Packaging Completed": "포장완료",
   "Repair Received": "수선접수",
@@ -22,7 +23,6 @@ const ORDER_STATUS_MAP = {
   "Delivery completed": "배송완료",
   "Receipt completed": "수령완료",
   Accommodation: "숙소",
-  Counsel: "상담",
 };
 
 const chunk = (array, size) => {

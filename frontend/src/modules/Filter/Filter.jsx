@@ -67,6 +67,7 @@ export const Filter = ({
           onChange={handleInputChange}
         >
           <option value="">전체</option>
+          <option value="Counsel">상담</option>
           <option value="Order Completed">주문완료</option>
           <option value="Packaging Completed">포장완료</option>
           <option value="Repair Received">수선접수</option>
@@ -75,7 +76,6 @@ export const Filter = ({
           <option value="Delivery completed">배송완료</option>
           <option value="Receipt completed">수령완료</option>
           <option value="Accommodation">숙소</option>
-          <option value="Counsel">상담</option>
         </select>
       </div>
 

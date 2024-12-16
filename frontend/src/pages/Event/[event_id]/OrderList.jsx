@@ -15,6 +15,7 @@ import {
 
 const formatOrderStatus = (status) => {
   const statusMap = {
+    Counsel: "상담",
     "Order Completed": "주문완료",
     "Packaging Completed": "포장완료",
     "Repair Received": "수선접수",
@@ -23,7 +24,6 @@ const formatOrderStatus = (status) => {
     "Delivery completed": "배송완료",
     "Receipt completed": "수령완료",
     Accommodation: "숙소",
-    Counsel: "상담",
   };
   return statusMap[status] || status;
 };
@@ -264,6 +264,7 @@ export const OrderList = () => {
                   onChange={(event) => handleOrderStatusChange(event, order.id)}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  <option value="Counsel">상담</option>
                   <option value="Order Completed">주문완료</option>
                   <option value="Packaging Completed">포장완료</option>
                   <option value="Repair Received">수선접수</option>
@@ -272,7 +273,6 @@ export const OrderList = () => {
                   <option value="Delivery completed">배송완료</option>
                   <option value="Receipt completed">수령완료</option>
                   <option value="Accommodation">숙소</option>
-                  <option value="Counsel">상담</option>
                 </select>
               </td>
               <td>{new Date(order.created_at).toLocaleDateString("ko-KR")}</td>
