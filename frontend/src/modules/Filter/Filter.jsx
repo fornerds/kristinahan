@@ -75,6 +75,7 @@ export const Filter = ({
           <option value="Delivery completed">배송완료</option>
           <option value="Receipt completed">수령완료</option>
           <option value="Accommodation">숙소</option>
+          <option value="Counsel">상담</option>
         </select>
       </div>
 
