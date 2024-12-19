@@ -15,8 +15,8 @@ import {
   useAuthors,
   useAffiliations,
   useUpdateOrderStatus,
-  useDownloadOrders,
 } from "../../../api/hooks";
+import { utils, write } from 'xlsx';
 
 const getCollectionMethod = (method) => {
   switch (method) {
@@ -31,10 +31,96 @@ const getCollectionMethod = (method) => {
   }
 };
 
+const getKoreanStatus = (status) => {
+  const statusMap = {
+    'Counsel': '상담',
+    'Order Completed': '주문완료',
+    'Packaging Completed': '포장완료',
+    'Repair Received': '수선접수',
+    'Repair Completed': '수선완료',
+    'In delivery': '배송중',
+    'Delivery completed': '배송완료',
+    'Receipt completed': '수령완료',
+    'Accommodation': '숙소'
+  };
+  return statusMap[status] || status;
+};
+
+const exportOrdersToExcel = (orders, authors, affiliations, filename = 'orders.xlsx') => {
+  // 엑셀에 표시할 열 정의
+  const headers = {
+    id: 'ID',
+    author: '작성자',
+    groomName: '신랑',
+    brideName: '신부',
+    affiliation: '소속',
+    collectionMethod: '수령방법',
+    status: '주문상태',
+    created_at: '주문일자',
+    totalPrice: '총주문금액',
+    totalPayment: '총결제금액',
+    payer: '결제자',
+    address: '주소지',
+    event_name: '행사'
+  };
+
+  // 데이터 변환
+  const excelData = orders.map(order => ({
+    id: order.id || '',
+    author: authors[order.author_id] || order.author_id || '',
+    groomName: order.groomName || '',
+    brideName: order.brideName || '',
+    affiliation: affiliations[order.affiliation_id] || order.affiliation_id || '',
+    collectionMethod: getCollectionMethod(order.collectionMethod) || '',
+    status: getKoreanStatus(order.status) || '',
+    created_at: order.created_at ? new Date(order.created_at).toLocaleDateString() : '',
+    totalPrice: order.totalPrice || 0,
+    totalPayment: (order.advancePayment + order.balancePayment) || 0,
+    payer: order?.payments?.[0]?.payer || '',
+    address: order.address || '',
+    event_name: order.event_name || ''
+  }));
+
+  // 워크시트 생성 - 수정된 부분
+  const ws = utils.json_to_sheet(
+    [
+      Object.values(headers), // 한글 헤더만 첫 번째 줄에 추가
+      ...excelData.map(row => Object.values(row)) // 데이터 행 추가
+    ], 
+    { skipHeader: true } // 기본 헤더 생성 건너뛰기
+  );
+
+  // 워크북 생성
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, '주문서 목록');
+
+  // 열 너비 자동 조정
+  const maxWidth = Object.keys(headers).reduce((acc, key, index) => ({
+    ...acc,
+    [index]: Math.max(
+      headers[key].length,
+      ...excelData.map(row => String(row[key]).length)
+    )
+  }), {});
+
+  ws['!cols'] = Object.values(maxWidth).map(width => ({ width: width + 2 }));
+
+  // 엑셀 파일 다운로드
+  const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export const OrderList = () => {
   const navigate = useNavigate();
-  const [isEventSelectionModalOpen, setIsEventSelectionModalOpen] =
-    useState(false);
+  const [isEventSelectionModalOpen, setIsEventSelectionModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const initialFilters = {
@@ -48,11 +134,12 @@ export const OrderList = () => {
   };
 
   const [filters, setFilters] = useState(initialFilters);
-
   const itemsPerPage = 10;
 
   // 데이터 fetching hooks
   const { data: events } = useCurrentEvents();
+  
+  // 페이지네이션된 데이터를 위한 쿼리
   const { data: ordersData, isLoading: ordersLoading } = useOrders(
     {
       ...filters,
@@ -64,10 +151,23 @@ export const OrderList = () => {
       refetchOnWindowFocus: false,
     }
   );
+
+  // 전체 데이터를 위한 별도 쿼리
+  const { data: allOrdersData, isLoading: allOrdersLoading } = useOrders(
+    {
+      ...filters,
+      limit: 999999,  // 충분히 큰 숫자로 설정
+      offset: 0,
+    },
+    {
+      enabled: true,
+      refetchOnWindowFocus: false,
+    }
+  );
+
   const { data: authorsData } = useAuthors();
   const { data: affiliationsData } = useAffiliations();
   const updateOrderStatusMutation = useUpdateOrderStatus();
-  const downloadOrdersMutation = useDownloadOrders();
 
   // 데이터 변환 메모이제이션
   const authors = useMemo(
@@ -141,17 +241,23 @@ export const OrderList = () => {
 
   const handleExcelDownload = useCallback(async () => {
     try {
-      await downloadOrdersMutation.mutateAsync(filters);
+      const allOrders = allOrdersData?.orders || [];
+      exportOrdersToExcel(
+        allOrders,
+        authors,
+        affiliations,
+        `주문서목록_${new Date().toLocaleDateString()}.xlsx`
+      );
     } catch (error) {
       console.error("Excel download failed:", error);
       alert("엑셀 다운로드에 실패했습니다. 다시 시도해주세요.");
     }
-  }, [downloadOrdersMutation, filters]);
+  }, [allOrdersData, authors, affiliations]);
 
   const handleTabChange = useCallback((tabName) => {
     setFilters((prev) => ({
       ...initialFilters,
-      event_name: prev.event_name, // 이벤트 이름 유지
+      event_name: prev.event_name,
       is_temp: tabName === "tab2",
     }));
     setCurrentPage(1);
@@ -286,7 +392,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
-                  disabled={downloadOrdersMutation.isLoading}
+                  disabled={ordersLoading || allOrdersLoading}
                 />
                 <Button
                   label="주문서 작성"
@@ -314,7 +420,7 @@ export const OrderList = () => {
                   label="Excel 저장"
                   className={styles.excelButton}
                   onClick={handleExcelDownload}
-                  disabled={downloadOrdersMutation.isLoading}
+                  disabled={ordersLoading || allOrdersLoading}
                 />
                 <Button
                   label="주문서 작성"

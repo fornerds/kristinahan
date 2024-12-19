@@ -465,21 +465,21 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
     setFormData((prev) => ({ ...prev, notes: value }));
   };
 
-  const handleAlterationChange = (repairId, field, value) => {
-    if (field === "notes") {
-      setFormData((prev) => ({
-        ...prev,
-        alter_notes: value,
-      }));
-      return;
-    }
+  const handleAlterNotesChange = (e) => {
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      alter_notes: value
+    }));
+  };
 
+  const handleAlterationChange = (repairId, field, value) => {
     setFormData((prev) => {
       const updatedDetails = [...prev.alteration_details];
       const existingDetailIndex = updatedDetails.findIndex(
         (detail) => detail.form_repair_id === repairId
       );
-
+  
       // value가 문자열인 경우 (입력 진행 중)
       if (typeof value === "string") {
         // 입력 진행 중인 값 그대로 유지
@@ -511,7 +511,7 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           });
         }
       }
-
+  
       return {
         ...prev,
         alteration_details: updatedDetails,
@@ -1133,10 +1133,10 @@ export const OrderForm = ({ event_id, orderId, onSave, onComplete }) => {
           <div className={styles.sectionVerticalGroup}>
             <h4 className={styles.sectionLabel}>비고</h4>
             <textarea
-              className={styles.optionalMessage}
-              value={formData.alter_notes}
-              onChange={(e) => handleAlterationChange("notes", e.target.value)}
-            />
+  className={styles.optionalMessage}
+  value={formData.alter_notes}
+  onChange={handleAlterNotesChange}
+/>
           </div>
         </div>
       </section>

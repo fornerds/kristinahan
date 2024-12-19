@@ -114,6 +114,31 @@
   color: #565e6d;
 }
 
+.sectionWrap h3.sectionTitle + .table th:nth-child(1),
+.sectionWrap h3.sectionTitle + .table td:nth-child(1) {
+  width: 20%;
+}
+
+.sectionWrap h3.sectionTitle + .table th:nth-child(2),
+.sectionWrap h3.sectionTitle + .table td:nth-child(2) {
+  width: 35%;
+}
+
+.sectionWrap h3.sectionTitle + .table th:nth-child(3),
+.sectionWrap h3.sectionTitle + .table td:nth-child(3) {
+  width: 15%;
+}
+
+.sectionWrap h3.sectionTitle + .table th:nth-child(4),
+.sectionWrap h3.sectionTitle + .table td:nth-child(4) {
+  width: 10%;
+}
+
+.sectionWrap h3.sectionTitle + .table th:nth-child(5),
+.sectionWrap h3.sectionTitle + .table td:nth-child(5) {
+  width: 20%;
+}
+
 .numberInput {
   border: 1px solid var(--cancel-color);
   border-radius: 6px;

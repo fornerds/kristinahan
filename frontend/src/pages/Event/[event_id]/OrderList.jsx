@@ -10,8 +10,8 @@ import {
   useAuthors,
   useAffiliations,
   useUpdateOrderStatus,
-  useDownloadOrders,
 } from "../../../api/hooks";
+import { utils, write } from 'xlsx';
 
 const formatOrderStatus = (status) => {
   const statusMap = {
@@ -41,6 +41,69 @@ const getCollectionMethod = (method) => {
   }
 };
 
+const exportOrdersToExcel = (orders, authors, affiliations, eventName = '', filename = 'orders.xlsx') => {
+  // 엑셀에 표시할 열 정의
+  const headers = [
+    'ID',
+    '작성자',
+    '신랑',
+    '신부',
+    '소속',
+    '수령방법',
+    '주문상태',
+    '주문일자',
+    '총주문금액',
+    '총결제금액',
+    '결제자',
+    '주소지'
+  ];
+
+  // 데이터 변환
+  const excelData = orders.map(order => [
+    order.id || '',
+    authors[order.author_id] || order.author_id || '',
+    order.groomName || '',
+    order.brideName || '',
+    affiliations[order.affiliation_id] || order.affiliation_id || '',
+    getCollectionMethod(order.collectionMethod) || '',
+    formatOrderStatus(order.status) || '',
+    order.created_at ? new Date(order.created_at).toLocaleDateString('ko-KR') : '',
+    order.totalPrice || 0,
+    order.advancePayment || 0,
+    order.payerName || '',
+    order.address || ''
+  ]);
+
+  // 워크시트 생성
+  const ws = utils.aoa_to_sheet([headers, ...excelData], { skipHeader: true });
+
+  // 워크북 생성
+  const wb = utils.book_new();
+  utils.book_append_sheet(wb, ws, eventName || '주문서 목록');
+
+  // 열 너비 자동 조정
+  const maxWidth = headers.map((h, idx) => 
+    Math.max(
+      h.length,
+      ...excelData.map(row => String(row[idx]).length)
+    )
+  );
+
+  ws['!cols'] = maxWidth.map(width => ({ width: width + 2 }));
+
+  // 엑셀 파일 다운로드
+  const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 export const OrderList = () => {
   const { event_id } = useParams();
   const navigate = useNavigate();
@@ -66,6 +129,7 @@ export const OrderList = () => {
     }
   );
 
+  // 페이지네이션된 데이터를 위한 쿼리
   const {
     data: ordersData,
     isLoading: ordersLoading,
@@ -81,10 +145,21 @@ export const OrderList = () => {
     }
   );
 
+  // 전체 데이터를 위한 별도 쿼리
+  const { data: allOrdersData, isLoading: allOrdersLoading } = useOrders(
+    {
+      ...filters,
+      limit: 999999,
+      offset: 0,
+    },
+    {
+      enabled: !!event_id && !!filters.event_name,
+    }
+  );
+
   const { data: authorsData } = useAuthors();
   const { data: affiliationsData } = useAffiliations();
   const updateOrderStatusMutation = useUpdateOrderStatus();
-  const downloadOrdersMutation = useDownloadOrders();
 
   const authors = useMemo(
     () =>
@@ -131,18 +206,21 @@ export const OrderList = () => {
     }
   }, [eventResponse]);
 
-  // filters 변경 추적을 위한 디버깅
-  useEffect(() => {
-    console.log("Filters changed:", filters);
-  }, [filters]);
-
   const handleExcelDownload = useCallback(() => {
-    downloadOrdersMutation.mutate({
-      ...filters,
-      limit: ordersData?.total || 0,
-      offset: 0,
-    });
-  }, [downloadOrdersMutation, filters, ordersData?.total]);
+    try {
+      const allOrders = allOrdersData?.orders || [];
+      exportOrdersToExcel(
+        allOrders,
+        authors,
+        affiliations,
+        eventResponse?.name,
+        `주문서목록_${eventResponse?.name}_${new Date().toLocaleDateString('ko-KR')}.xlsx`
+      );
+    } catch (error) {
+      console.error("Excel download failed:", error);
+      alert("엑셀 다운로드에 실패했습니다. 다시 시도해주세요.");
+    }
+  }, [allOrdersData, authors, affiliations, eventResponse]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -315,7 +393,7 @@ export const OrderList = () => {
                 label="Excel 저장"
                 className={styles.excelButton}
                 onClick={handleExcelDownload}
-                disabled={downloadOrdersMutation.isLoading}
+                disabled={ordersLoading || allOrdersLoading}
               />
               <Link
                 to={`/event/${event_id}/create`}
@@ -345,7 +423,7 @@ export const OrderList = () => {
                 label="Excel 저장"
                 className={styles.excelButton}
                 onClick={handleExcelDownload}
-                disabled={downloadOrdersMutation.isLoading}
+                disabled={ordersLoading || allOrdersLoading}
               />
               <Link
                 to={`/event/${event_id}/create`}
