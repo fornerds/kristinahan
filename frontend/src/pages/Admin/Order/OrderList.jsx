@@ -46,6 +46,10 @@ const getKoreanStatus = (status) => {
   return statusMap[status] || status;
 };
 
+const formatCurrency = (amount) => {
+  return amount ? amount.toLocaleString('ko-KR') : '0';
+};
+
 const exportOrdersToExcel = (orders, authors, affiliations, filename = 'orders.xlsx') => {
   // 엑셀에 표시할 열 정의
   const headers = {
@@ -61,7 +65,10 @@ const exportOrdersToExcel = (orders, authors, affiliations, filename = 'orders.x
     totalPayment: '총결제금액',
     payer: '결제자',
     address: '주소지',
-    event_name: '행사'
+    event_name: '행사',
+    products: '상품정보',
+    notes: '비고',
+    alter_notes: '수선내용'
   };
 
   // 데이터 변환
@@ -73,41 +80,101 @@ const exportOrdersToExcel = (orders, authors, affiliations, filename = 'orders.x
     affiliation: affiliations[order.affiliation_id] || order.affiliation_id || '',
     collectionMethod: getCollectionMethod(order.collectionMethod) || '',
     status: getKoreanStatus(order.status) || '',
-    created_at: order.created_at ? new Date(order.created_at).toLocaleDateString() : '',
-    totalPrice: order.totalPrice || 0,
-    totalPayment: (order.advancePayment + order.balancePayment) || 0,
+    created_at: order.created_at ? new Date(order.created_at).toLocaleDateString('ko-KR') : '',
+    totalPrice: formatCurrency(order.totalPrice),
+    totalPayment: formatCurrency(order.advancePayment + order.balancePayment),
     payer: order?.payments?.[0]?.payer || '',
     address: order.address || '',
-    event_name: order.event_name || ''
+    event_name: order.event_name || '',
+    products: order.orderItems?.map((item, index) => 
+      `상품${index + 1}: ${item.product.name}, 사이즈: ${item.attributes[0]?.value || '-'}, 수량: ${item.quantity}개`
+    ).join('\n') || '',
+    notes: order.notes || '',
+    alter_notes: order.alter_notes || ''
   }));
 
-  // 워크시트 생성 - 수정된 부분
-  const ws = utils.json_to_sheet(
-    [
-      Object.values(headers), // 한글 헤더만 첫 번째 줄에 추가
-      ...excelData.map(row => Object.values(row)) // 데이터 행 추가
-    ], 
-    { skipHeader: true } // 기본 헤더 생성 건너뛰기
-  );
+  // 워크시트 생성
+  const ws = utils.json_to_sheet([
+    Object.values(headers), // 헤더 행
+    ...excelData.map(row => Object.values(row)) // 데이터 행
+  ], { skipHeader: true });
 
   // 워크북 생성
   const wb = utils.book_new();
   utils.book_append_sheet(wb, ws, '주문서 목록');
 
   // 열 너비 자동 조정
-  const maxWidth = Object.keys(headers).reduce((acc, key, index) => ({
-    ...acc,
-    [index]: Math.max(
-      headers[key].length,
-      ...excelData.map(row => String(row[key]).length)
-    )
-  }), {});
+  const maxWidth = {};
+  Object.keys(headers).forEach((key, index) => {
+    maxWidth[index] = Math.max(
+      headers[key].length * 2, // 헤더 길이
+      ...excelData.map(row => {
+        const cellContent = String(row[key] || '');
+        const lines = cellContent.split('\n');
+        return Math.max(...lines.map(line => line.length));
+      })
+    );
+  });
 
-  ws['!cols'] = Object.values(maxWidth).map(width => ({ width: width + 2 }));
+  // 열 너비 설정
+  ws['!cols'] = Object.values(maxWidth).map(width => ({
+    width: Math.min(Math.max(width, 8), 50) // 최소 8, 최대 50
+  }));
+
+  // 셀 스타일 설정
+  const range = utils.decode_range(ws['!ref']);
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const cell_address = utils.encode_cell({ r: R, c: C });
+      const cell = ws[cell_address];
+      
+      if (!cell) continue;
+
+      // 기본 스타일 설정
+      cell.s = {
+        alignment: {
+          vertical: 'center',
+          horizontal: 'center',
+          wrapText: true
+        },
+        border: {
+          top: { style: 'thin' },
+          bottom: { style: 'thin' },
+          left: { style: 'thin' },
+          right: { style: 'thin' }
+        },
+        font: { name: '맑은 고딕' }
+      };
+
+      // 헤더 행 스타일
+      if (R === 0) {
+        cell.s.fill = { fgColor: { rgb: "FFE5E5E5" } };
+        cell.s.font.bold = true;
+      }
+
+      // 금액 컬럼 스타일 (우측 정렬)
+      if (['총주문금액', '총결제금액'].includes(headers[Object.keys(headers)[C]])) {
+        cell.s.alignment.horizontal = 'right';
+      }
+
+      // 텍스트가 긴 컬럼 스타일 (좌측 정렬)
+      if (['상품정보', '비고', '수선내용'].includes(headers[Object.keys(headers)[C]])) {
+        cell.s.alignment.horizontal = 'left';
+      }
+    }
+  }
 
   // 엑셀 파일 다운로드
-  const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const excelBuffer = write(wb, { 
+    bookType: 'xlsx', 
+    type: 'array',
+    cellStyles: true 
+  });
+  
+  const blob = new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
+  
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -200,6 +267,10 @@ export const OrderList = () => {
   // filters 변경 모니터링
   useEffect(() => {
     console.log("Filters changed:", filters);
+    console.log("allOrdersData", allOrdersData);
+    console.log("authors", authors)
+    console.log("affiliations", affiliations);
+    
   }, [filters]);
 
   // Event Handlers
