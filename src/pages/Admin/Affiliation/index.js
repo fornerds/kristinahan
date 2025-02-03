@@ -1,1 +1,0 @@
-export { AffiliationList } from "./AffiliationList"
